@@ -20,7 +20,7 @@ import {
   engineAbi,
 } from "./shared/nara";
 
-// ── Types ────────────────────────────────────────────────────────────────────
+// Types
 
 type FlashTone = "neutral" | "error" | "success" | "winner" | "draw-ready";
 
@@ -39,7 +39,7 @@ type DrawRecord = {
 
 const MIN_ACTIVE_PLAYERS = 1;
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// Helpers
 
 function shortAddress(addr: string): string {
   return addr.slice(0, 6) + "..." + addr.slice(-4);
@@ -114,7 +114,7 @@ function describeTxError(label: string, error: unknown): string {
   return first || `${label} failed. Try again.`;
 }
 
-// ── Components ───────────────────────────────────────────────────────────────
+// Components
 
 function CaretIcon() {
   return (
@@ -203,7 +203,7 @@ function WalletSetupCard({
   );
 }
 
-// ── Main App ─────────────────────────────────────────────────────────────────
+// Main App
 
 export default function App() {
   const { address, chainId, isConnected } = useAccount();
@@ -219,7 +219,7 @@ export default function App() {
 
   const isWrongNetwork = Boolean(isConnected && chainId != null && chainId !== NARA_CHAIN_ID);
 
-  // ── Contract reads ────────────────────────────────────────────────────────
+  // Contract reads
 
   const potNaraRead = useReadContract({
     address: NARA_LOTTO_POOL_ADDRESS,
@@ -330,7 +330,7 @@ export default function App() {
     query: { enabled: amountWei > 0n && lockDurationEpochs > 0n },
   });
 
-  // ── Derived values ────────────────────────────────────────────────────────
+  // Derived values
 
   const epochStateData = epochStateRead.data as any;
   const currentEpoch = Number(epochStateData?.[0] ?? epochStateData?.epoch ?? 0n);
@@ -406,7 +406,7 @@ export default function App() {
           : null
     : null;
 
-  // ── Draw history fetch ────────────────────────────────────────────────────
+  // Draw history fetch
 
   const fetchDrawHistory = useCallback(async () => {
     if (!publicClient) return;
@@ -451,7 +451,7 @@ export default function App() {
     void fetchDrawHistory();
   }, [fetchDrawHistory]);
 
-  // ── Invalidate queries helper ─────────────────────────────────────────────
+  // Invalidate queries helper
 
   const invalidateLotto = useCallback(() => {
     queryClient.invalidateQueries();
@@ -471,7 +471,7 @@ export default function App() {
     return true;
   }, [isConnected, isWrongNetwork]);
 
-  // ── Tx handlers ──────────────────────────────────────────────────────────
+  // Tx handlers
 
   const handleApprove = async () => {
     if (!ensureWalletReady("approve NARA") || !depositAmount || amountWei === 0n) return;
@@ -603,7 +603,7 @@ export default function App() {
 
   const isBusy = txStep !== "idle";
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  // Render
 
   return (
     <>
@@ -611,82 +611,87 @@ export default function App() {
     <main id="main-content">
     <div className="nb-shell">
 
-      {/* ── Hero ── */}
-      <header className="nb-hero">
-        <div>
-          <h1>Lucky Epoch</h1>
-          <div className="nb-hero-meta">
-            <p className="nb-subtitle">join with NARA, wait for warm-up, withdraw later</p>
-            <div className="nb-epoch-pill">
-              <span className="nb-epoch-dot" />
-              <span>Epoch</span>
-              <span className="nb-epoch-num">{currentEpoch > 0 ? currentEpoch.toLocaleString() : "..."}</span>
-            </div>
+      {/* Nav */}
+      <header className="nb-nav">
+        <div className="nb-nav-brand">
+          <h1><span className="nb-brand-accent">NARA</span> Lucky Epoch</h1>
+          <div className="nb-epoch-pill">
+            <span className="nb-epoch-dot" />
+            <span>Epoch</span>
+            <span className="nb-epoch-num">{currentEpoch > 0 ? currentEpoch.toLocaleString() : "..."}</span>
           </div>
         </div>
-        <div className="nb-hero-actions">
+        <div className="nb-nav-actions">
           <WalletHeroButton />
         </div>
       </header>
 
-      {/* ── Stats row ── */}
-      <section className="nb-stats-grid">
-        {/* Pot */}
-        <div className="nb-stat-card">
-          <p className="nb-stat-label">Prize Pool</p>
-          <p className="nb-stat-value">{formatNara(potNara)} NARA</p>
-          <p className="nb-stat-sub">+ {formatEth(potEth)} ETH</p>
+      {/* Jackpot Hero */}
+      <section className="nb-jackpot-hero" aria-label="Prize Pool">
+        <div className="nb-jackpot-shimmer" aria-hidden="true" />
+        <p className="nb-jackpot-label">Live Prize Pool</p>
+        <div className="nb-jackpot-amount">
+          <span className="nb-jackpot-nara">{formatNara(potNara)}<span className="nb-jackpot-unit"> NARA</span></span>
+          <span className="nb-jackpot-divider">+</span>
+          <span className="nb-jackpot-eth">{formatEth(potEth)}<span className="nb-jackpot-unit"> ETH</span></span>
         </div>
-
-        {/* Players */}
-        <div className="nb-stat-card">
-          <p className="nb-stat-label">Entries</p>
-          <p className="nb-stat-value">{participantCount} / {maxParticipants}</p>
-          <div className="nb-stat-prog-track">
-            <div className="nb-stat-prog-fill" style={{ width: `${maxParticipants > 0 ? Math.round((participantCount / maxParticipants) * 100) : 0}%` }} />
-          </div>
-          <p className="nb-stat-sub">{MIN_ACTIVE_PLAYERS} active entry needed - {openSpots} spots open</p>
+        <p className="nb-jackpot-sub">Lock NARA, keep your principal, and one live entry wins the pooled yield.</p>
+        <div className="nb-jackpot-tags">
+          <span className="nb-jackpot-tag">live on base</span>
+          <span className="nb-jackpot-tag">principal protected</span>
+          <span className="nb-jackpot-tag">{MIN_ACTIVE_PLAYERS} live player needed</span>
+          <span className="nb-jackpot-tag">chainlink vrf</span>
         </div>
+      </section>
 
-        {/* Your odds */}
-        <div className="nb-stat-card">
-          <p className="nb-stat-label">Win Chance</p>
-          {isConnected && !isWrongNetwork && isParticipant && entryIsLive ? (
+      {/* Context row */}
+      <section className="nb-context-row" aria-label="Pool stats">
+        <div className={`nb-ctx-card nb-ctx-timer${drawReady ? " nb-ctx-ready" : ""}${drawPending ? " nb-ctx-pending" : ""}`}>
+          <p className="nb-ctx-label">Draw Status</p>
+          {drawPending ? (
             <>
-              <p className="nb-stat-value">{userOddsPercent.toFixed(2)}%</p>
-              <p className="nb-stat-sub">while your entry is live</p>
+              <p className="nb-ctx-value nb-ctx-vrf">VRF</p>
+              <p className="nb-ctx-sub">winner being picked now</p>
+            </>
+          ) : drawReady ? (
+            <>
+              <p className="nb-ctx-value nb-ctx-rdy">Ready</p>
+              <p className="nb-ctx-sub">draw can run now</p>
             </>
           ) : (
             <>
-              <p className="nb-stat-value">-</p>
-              <p className="nb-stat-sub">{!isConnected ? "connect to see" : isWrongNetwork ? `switch to ${NARA_CHAIN_NAME}` : isParticipant ? "warming up" : "join to see"}</p>
+              <p className="nb-ctx-value">{epochsUntilDraw > 0 ? epochsToTime(epochsUntilDraw) : "-"}</p>
+              <p className="nb-ctx-sub">until draw / epoch {nextDrawEpoch > 0 ? nextDrawEpoch : "-"}</p>
             </>
           )}
         </div>
 
-        {/* Draw countdown */}
-        <div className="nb-stat-card">
-          <p className="nb-stat-label">Draw Timer</p>
-          {drawReady ? (
+        <div className="nb-ctx-card">
+          <p className="nb-ctx-label">Entries</p>
+          <p className="nb-ctx-value">{participantCount}<span className="nb-ctx-value-max"> / {maxParticipants}</span></p>
+          <div className="nb-ctx-prog-track">
+            <div className="nb-ctx-prog-fill" style={{ width: `${maxParticipants > 0 ? Math.round((participantCount / maxParticipants) * 100) : 0}%` }} />
+          </div>
+          <p className="nb-ctx-sub">{openSpots} spot{openSpots === 1 ? "" : "s"} open</p>
+        </div>
+
+        <div className="nb-ctx-card">
+          <p className="nb-ctx-label">Your Odds</p>
+          {isConnected && !isWrongNetwork && isParticipant && entryIsLive ? (
             <>
-              <p className="nb-stat-value draw-ready">Ready</p>
-              <p className="nb-stat-sub">timer finished - someone can run it</p>
-            </>
-          ) : drawPending ? (
-            <>
-              <p className="nb-stat-value draw-pending">VRF</p>
-              <p className="nb-stat-sub">winner is being picked now</p>
+              <p className="nb-ctx-value nb-ctx-live">{userOddsPercent.toFixed(2)}<span className="nb-ctx-value-max">%</span></p>
+              <p className="nb-ctx-sub"><span className="nb-live-dot" /> live in draw</p>
             </>
           ) : (
             <>
-              <p className="nb-stat-value">{epochsUntilDraw > 0 ? epochsToTime(epochsUntilDraw) : "-"}</p>
-              <p className="nb-stat-sub">entries stay open</p>
+              <p className="nb-ctx-value">-</p>
+              <p className="nb-ctx-sub">{!isConnected ? "connect to see" : isWrongNetwork ? `switch to ${NARA_CHAIN_NAME}` : isParticipant ? "warming up" : "join to see"}</p>
             </>
           )}
         </div>
       </section>
 
-      {/* ── Flash banner ── */}
+      {/* Flash banner */}
       {hasWinnings && (
         <div className="nb-flash winner">
           Good news - you have a prize ready to claim: {formatNara(winningsNara)} NARA + {formatEth(winningsEth)} ETH
@@ -721,16 +726,16 @@ export default function App() {
         </div>
       )}
 
-      {/* ── Main 2-col ── */}
-      <div className="nb-main-grid">
+      {/* Action zone */}
+      <div className="nb-action-zone">
 
         {/* Deposit Panel */}
-        <div className="nb-panel">
+        <div className="nb-panel nb-panel-start">
           <div className="nb-panel-headline">
             <div>
-              <h2 className="nb-panel-header">Start Here</h2>
+              <h2 className="nb-panel-header">Join The Prize Pool</h2>
               <p className="nb-panel-intro">
-                Pick an amount, approve once, then join. Your entry goes live after a short warm-up.
+                Choose how much NARA to lock, approve once, then join. Your principal stays yours while the yield builds the prize pool.
               </p>
             </div>
             <span className="nb-badge not-in-draw">{openSpots} spot{openSpots === 1 ? "" : "s"} open</span>
@@ -905,7 +910,7 @@ export default function App() {
           </details>
         </div>
         {/* My Position */}
-        <div className="nb-panel">
+        <div className="nb-panel nb-panel-entry">
           <h2 className="nb-panel-header">Your Entry</h2>
 
           {!isConnected ? (
@@ -1026,9 +1031,9 @@ export default function App() {
         </div>
       </div>
 
-      {/* ── Draw Section ── */}
+      {/* Draw Section */}
       <div className="nb-draw-section">
-        <h2 className="nb-panel-header">Draw Timer</h2>
+        <h2 className="nb-panel-header">Prize Draw</h2>
 
         <div className="nb-draw-trigger-row">
           <div>
@@ -1050,7 +1055,7 @@ export default function App() {
           </div>
 
           <p className="nb-draw-explainer">
-            The timer only tells you when the draw can run. New entries stay open until someone actually runs it.
+            The timer shows when the draw can be run. Entries stay open until someone actually runs it on-chain.
           </p>
 
           {!isConnected || isWrongNetwork ? (
@@ -1149,7 +1154,7 @@ export default function App() {
         )}
       </div>
 
-      {/* ── Trust bar ── */}
+      {/* Trust bar */}
       <div className="nb-trust-bar">
         <a
           href={`https://basescan.org/address/${NARA_LOTTO_POOL_ADDRESS}`}
@@ -1184,4 +1189,3 @@ export default function App() {
     </>
   );
 }
-
