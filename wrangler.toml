@@ -1,0 +1,12 @@
+name = "nara-lockboard"
+compatibility_date = "2026-03-22"
+compatibility_flags = ["nodejs_compat"]
+pages_build_output_dir = "./dist"
+
+[vars]
+BASE_RPC_URL = "https://base-mainnet.g.alchemy.com/v2/2SfPih6j2ng_UXyrD4Ceq"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "nara-lockboard"
+database_id = "f48dd6c7-79aa-4a0c-b4e9-830744afa7b2"

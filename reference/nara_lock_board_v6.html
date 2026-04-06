@@ -1,0 +1,453 @@
+
+<style>
+#nb{position:relative;padding:1rem 0;font-family:var(--font-mono)}
+.nb-hdr{text-align:center;margin-bottom:1rem}
+.nb-ttl{font-size:20px;font-weight:500;color:var(--color-text-primary);letter-spacing:0.1em}
+.nb-sub{font-size:11px;color:var(--color-text-secondary);margin-top:3px;letter-spacing:0.05em}
+.nb-stats{display:flex;gap:8px;justify-content:center;margin-bottom:1rem;flex-wrap:wrap}
+.nb-stat{background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:8px 14px;text-align:center;border:0.5px solid var(--color-border-tertiary)}
+.nb-stat-val{font-size:18px;font-weight:500;color:var(--color-text-primary)}
+.nb-stat-lbl{font-size:9px;color:var(--color-text-secondary);margin-top:1px;letter-spacing:0.04em;text-transform:uppercase}
+.nb-prog-wrap{max-width:440px;margin:0 auto 1rem}
+.nb-prog-lbl{display:flex;justify-content:space-between;font-size:10px;color:var(--color-text-secondary);margin-bottom:5px}
+.nb-prog-bar{height:3px;background:var(--color-border-tertiary);border-radius:2px;overflow:hidden}
+.nb-prog-fill{height:100%;width:0%;background:var(--color-text-warning);transition:width 0.6s ease;border-radius:2px}
+.nb-legend{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-bottom:1rem}
+.nb-leg{display:flex;align-items:center;gap:4px;font-size:9px;color:var(--color-text-secondary)}
+.nb-leg-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.nb-grid{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:5px;margin-bottom:1rem}
+.nb-slot{aspect-ratio:1;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;position:relative;transition:transform 0.15s;overflow:hidden;user-select:none;padding:2px}
+.nb-slot.unclaimed{background:var(--color-background-secondary);border:1px dashed var(--color-border-secondary)}
+.nb-slot.unclaimed:hover{transform:scale(1.18);z-index:10;border-style:solid;border-color:var(--color-border-primary)}
+.nb-slot.claimed{border:1.5px solid;background:var(--color-background-secondary)}
+.nb-slot.claimed:hover{transform:scale(1.18);z-index:10}
+.nb-slot-n{font-size:5.5px;color:var(--color-text-secondary);opacity:0.45;line-height:1;position:absolute;top:4px;left:0;right:0;text-align:center}
+.nb-slot-ico{display:flex;align-items:center;justify-content:center;margin-top:6px}
+.nb-slot-lbl{font-size:6px;font-weight:500;line-height:1;margin-top:2px;text-align:center;max-width:90%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.t50.unclaimed .nb-slot-ico svg{color:var(--color-text-secondary)}
+.t50.unclaimed .nb-slot-lbl{color:var(--color-text-secondary)}
+.t50.claimed{border-color:var(--color-border-secondary)}
+.t50.claimed .nb-slot-lbl{color:var(--color-text-secondary)}
+.t100.unclaimed .nb-slot-ico svg{color:var(--color-text-info)}
+.t100.unclaimed .nb-slot-lbl{color:var(--color-text-info)}
+.t100.claimed{border-color:var(--color-border-info);background:var(--color-background-info)}
+.t100.claimed .nb-slot-lbl{color:var(--color-text-info)}
+.t250.unclaimed .nb-slot-ico svg{color:#7F77DD}
+.t250.unclaimed .nb-slot-lbl{color:#7F77DD}
+.t250.claimed{border-color:#AFA9EC}
+.t250.claimed .nb-slot-lbl{color:#7F77DD}
+.t500.unclaimed .nb-slot-ico svg{color:var(--color-text-warning)}
+.t500.unclaimed .nb-slot-lbl{color:var(--color-text-warning)}
+.t500.claimed{border-color:var(--color-border-warning);background:var(--color-background-warning)}
+.t500.claimed .nb-slot-lbl{color:var(--color-text-warning)}
+.t1000.unclaimed .nb-slot-ico svg{color:var(--color-text-danger)}
+.t1000.unclaimed .nb-slot-lbl{color:var(--color-text-danger)}
+.t1000.claimed{border-color:var(--color-border-danger);background:var(--color-background-danger)}
+.t1000.claimed .nb-slot-lbl{color:var(--color-text-danger)}
+@keyframes breathe{0%,100%{opacity:0.3;transform:scale(0.9)}50%{opacity:1;transform:scale(1.05)}}
+@keyframes breathe-fast{0%,100%{opacity:0.25;transform:scale(0.88)}50%{opacity:1;transform:scale(1.08)}}
+.t50.unclaimed .nb-slot-ico{animation:breathe 3s ease-in-out infinite}
+.t100.unclaimed .nb-slot-ico{animation:breathe 2.8s ease-in-out infinite}
+.t250.unclaimed .nb-slot-ico{animation:breathe 2.4s ease-in-out infinite}
+.t500.unclaimed .nb-slot-ico{animation:breathe-fast 2s ease-in-out infinite}
+.t1000.unclaimed .nb-slot-ico{animation:breathe-fast 1.6s ease-in-out infinite}
+.nb-ticker-wrap{border-top:0.5px solid var(--color-border-tertiary);padding-top:10px;overflow:hidden;margin-bottom:4px}
+.nb-ticker{display:flex;gap:48px;white-space:nowrap;animation:nbticker 30s linear infinite}
+.nb-ticker-item{font-size:9px;color:var(--color-text-secondary);flex-shrink:0}
+.nb-ticker-item b{color:var(--color-text-primary);font-weight:500}
+@keyframes nbticker{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+.nb-overlay{position:absolute;inset:0;z-index:30;background:rgba(0,0,0,0.55);display:none;align-items:flex-start;justify-content:center;padding-top:30px;padding-bottom:30px;border-radius:var(--border-radius-lg)}
+.nb-overlay.open{display:flex}
+.nb-modal{background:var(--color-background-primary);border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-lg);padding:1.25rem;width:100%;max-width:320px;overflow-y:auto;max-height:calc(100% - 30px)}
+.nb-modal-ttl{font-size:14px;font-weight:500;color:var(--color-text-primary);margin-bottom:2px}
+.nb-modal-sub{font-size:10px;color:var(--color-text-secondary);margin-bottom:1rem}
+.nb-sect{font-size:9px;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:0.06em;margin-top:14px;margin-bottom:6px;padding-bottom:4px;border-bottom:0.5px solid var(--color-border-tertiary)}
+.nb-modal label{display:block;font-size:9px;color:var(--color-text-secondary);margin-bottom:3px;margin-top:10px;text-transform:uppercase;letter-spacing:0.04em}
+.nb-modal label span{color:var(--color-text-danger)}
+.nb-modal input,.nb-modal textarea{width:100%;box-sizing:border-box;font-size:12px;font-family:var(--font-mono)}
+.nb-modal textarea{height:44px;resize:none}
+.nb-display-tabs{display:flex;gap:4px;margin-bottom:10px}
+.nb-dtab{flex:1;font-size:10px;padding:5px 4px;border-radius:var(--border-radius-md);border:0.5px solid var(--color-border-tertiary);background:var(--color-background-secondary);color:var(--color-text-secondary);cursor:pointer;text-align:center;font-family:var(--font-mono);transition:all 0.1s}
+.nb-dtab.active{border-color:var(--color-border-primary);color:var(--color-text-primary);background:var(--color-background-primary)}
+.nb-display-panel{display:none}
+.nb-display-panel.active{display:block}
+.nb-char-input{font-size:32px!important;text-align:center;height:52px!important;letter-spacing:0.05em}
+.nb-char-hint{font-size:9px;color:var(--color-text-secondary);margin-top:4px}
+.nb-emoji-grid{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.nb-emoji-btn{font-size:18px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;border:0.5px solid var(--color-border-tertiary);border-radius:6px;cursor:pointer;background:var(--color-background-secondary);transition:transform 0.1s}
+.nb-emoji-btn:hover,.nb-emoji-btn.sel{transform:scale(1.15);border-color:var(--color-border-primary);background:var(--color-background-primary)}
+.nb-preview-wrap{display:flex;align-items:center;gap:12px;margin:10px 0;padding:10px;background:var(--color-background-secondary);border-radius:var(--border-radius-md);border:0.5px solid var(--color-border-tertiary)}
+.nb-preview-slot{width:48px;height:48px;border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden}
+.nb-preview-label{font-size:10px;color:var(--color-text-secondary);line-height:1.5}
+.nb-preview-label b{color:var(--color-text-primary);font-weight:500;display:block}
+.nb-err{font-size:10px;color:var(--color-text-danger);margin-top:6px;min-height:14px}
+.nb-modal-btns{display:flex;gap:8px;margin-top:12px}
+.nb-modal-btns button{flex:1;font-size:11px;font-family:var(--font-mono)}
+.nb-lock-btn{background:var(--color-background-warning)!important;border-color:var(--color-border-warning)!important;color:var(--color-text-warning)!important;font-weight:500}
+.nb-adj-hint{font-size:9px;color:var(--color-text-warning);background:var(--color-background-warning);border:0.5px solid var(--color-border-warning);border-radius:var(--border-radius-md);padding:5px 8px;margin-bottom:8px;display:none}
+.nb-profile-overlay{position:absolute;inset:0;z-index:30;background:rgba(0,0,0,0.55);display:none;align-items:flex-start;justify-content:center;padding-top:40px;border-radius:var(--border-radius-lg)}
+.nb-profile-overlay.open{display:flex}
+.nb-profile{background:var(--color-background-primary);border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-lg);padding:1.25rem;width:100%;max-width:290px}
+.nb-profile-badge{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.nb-profile-avatar{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;border:0.5px solid var(--color-border-secondary);overflow:hidden}
+.nb-profile-id{flex:1}
+.nb-profile-alias{font-size:14px;font-weight:500;color:var(--color-text-primary);line-height:1.2}
+.nb-profile-slot{font-size:10px;color:var(--color-text-secondary)}
+.nb-profile-tier{display:inline-block;font-size:9px;padding:2px 7px;border-radius:var(--border-radius-md);border:0.5px solid;margin-bottom:10px}
+.nb-profile-project{background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:10px 12px;margin-bottom:10px;border:0.5px solid var(--color-border-tertiary)}
+.nb-profile-proj-name{font-size:12px;font-weight:500;color:var(--color-text-primary);margin-bottom:2px}
+.nb-profile-proj-desc{font-size:11px;color:var(--color-text-secondary);line-height:1.4}
+.nb-profile-msg{font-size:11px;color:var(--color-text-secondary);font-style:italic;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--color-border-secondary)}
+.nb-profile-links{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.nb-profile-link{font-size:10px;padding:4px 10px;border-radius:var(--border-radius-md);border:0.5px solid var(--color-border-secondary);color:var(--color-text-secondary);background:var(--color-background-secondary);cursor:pointer;text-decoration:none;display:inline-block}
+.nb-profile-link:hover{border-color:var(--color-border-primary);color:var(--color-text-primary)}
+.nb-profile-locked{font-size:10px;color:var(--color-text-secondary);margin-bottom:12px}
+.nb-profile-locked b{color:var(--color-text-primary);font-weight:500}
+.nb-profile-btns{display:flex;gap:8px}
+.nb-profile-btns button{flex:1;font-size:10px;font-family:var(--font-mono)}
+.nb-share-btn{background:var(--color-background-info)!important;border-color:var(--color-border-info)!important;color:var(--color-text-info)!important}
+.nb-tweet-preview{background:var(--color-background-secondary);border-radius:var(--border-radius-md);border:0.5px solid var(--color-border-tertiary);padding:10px 12px;margin-bottom:10px;font-size:10px;color:var(--color-text-primary);line-height:1.6;white-space:pre-wrap}
+.nb-toast{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);background:var(--color-background-success);border:0.5px solid var(--color-border-success);border-radius:var(--border-radius-md);padding:8px 16px;font-size:11px;color:var(--color-text-success);display:none;white-space:nowrap;z-index:40}
+</style>
+
+<div id="nb">
+  <div class="nb-hdr">
+    <div class="nb-ttl">NARA LOCK BOARD</div>
+    <div class="nb-sub">100 founding lockers · lock NARA · make your mark</div>
+  </div>
+  <div class="nb-stats">
+    <div class="nb-stat"><div class="nb-stat-val" id="s-claimed">0</div><div class="nb-stat-lbl">Claimed</div></div>
+    <div class="nb-stat"><div class="nb-stat-val" id="s-locked">0</div><div class="nb-stat-lbl">NARA Locked</div></div>
+    <div class="nb-stat"><div class="nb-stat-val" id="s-left">100</div><div class="nb-stat-lbl">Slots Left</div></div>
+  </div>
+  <div class="nb-prog-wrap">
+    <div class="nb-prog-lbl"><span id="prog-txt">0 / 100 founding slots claimed</span><span id="prog-pct">0%</span></div>
+    <div class="nb-prog-bar"><div class="nb-prog-fill" id="prog-fill"></div></div>
+  </div>
+  <div class="nb-legend">
+    <div class="nb-leg"><div class="nb-leg-dot" style="background:var(--color-text-secondary)"></div>50</div>
+    <div class="nb-leg"><div class="nb-leg-dot" style="background:var(--color-text-info)"></div>100</div>
+    <div class="nb-leg"><div class="nb-leg-dot" style="background:#7F77DD"></div>250</div>
+    <div class="nb-leg"><div class="nb-leg-dot" style="background:var(--color-text-warning)"></div>500</div>
+    <div class="nb-leg"><div class="nb-leg-dot" style="background:var(--color-text-danger)"></div>1000</div>
+  </div>
+  <div class="nb-grid" id="nb-grid"></div>
+  <div class="nb-ticker-wrap"><div class="nb-ticker" id="nb-ticker"></div></div>
+
+  <div class="nb-overlay" id="nb-overlay">
+    <div class="nb-modal">
+      <div class="nb-modal-ttl" id="modal-ttl">Claim Slot #00</div>
+      <div class="nb-modal-sub" id="modal-sub"></div>
+      <div class="nb-adj-hint" id="adj-hint"></div>
+      <div class="nb-sect">What shows on your slot</div>
+      <div class="nb-display-tabs">
+        <div class="nb-dtab active" onclick="switchTab('letter')">Letter / text</div>
+        <div class="nb-dtab" onclick="switchTab('emoji')">Emoji</div>
+        <div class="nb-dtab" onclick="switchTab('image')">Image URL</div>
+      </div>
+      <div class="nb-display-panel active" id="panel-letter">
+        <input class="nb-char-input" type="text" id="m-char" placeholder="N" maxlength="3" oninput="updatePreview()">
+        <div class="nb-char-hint">1–3 chars · buy 4 slots in a row to spell NARA across the board</div>
+      </div>
+      <div class="nb-display-panel" id="panel-emoji">
+        <div class="nb-emoji-grid" id="emoji-grid"></div>
+        <input style="margin-top:8px;font-size:20px;text-align:center" type="text" id="m-emoji-custom" placeholder="or paste any emoji" maxlength="4" oninput="onEmojiCustom()">
+      </div>
+      <div class="nb-display-panel" id="panel-image">
+        <label>Image URL (NFT, logo, pfp)</label>
+        <input type="text" id="m-imgurl" placeholder="https://..." oninput="updatePreview()">
+        <div class="nb-char-hint">Direct image link — png, jpg, gif, svg</div>
+      </div>
+      <div class="nb-preview-wrap">
+        <div class="nb-preview-slot" id="preview-slot"></div>
+        <div class="nb-preview-label"><b id="preview-label">Your slot preview</b>This is how you appear on the board</div>
+      </div>
+      <div class="nb-sect">Identity</div>
+      <label>Alias / name <span>*</span></label>
+      <input type="text" id="m-alias" placeholder="CryptoWolf" maxlength="24" oninput="updatePreview()">
+      <label>Amount to lock (NARA) <span>*</span></label>
+      <input type="number" id="m-amount" placeholder="50" min="50">
+      <div class="nb-sect">Your project (shows on your profile card only)</div>
+      <label>Project name</label>
+      <input type="text" id="m-proj" placeholder="Vault Finance" maxlength="30">
+      <label>One-liner</label>
+      <input type="text" id="m-desc" placeholder="DeFi yield on Base" maxlength="60">
+      <label>Twitter / X</label>
+      <input type="text" id="m-twitter" placeholder="@yourhandle" maxlength="40">
+      <label>Farcaster</label>
+      <input type="text" id="m-farcaster" placeholder="@yourname" maxlength="40">
+      <label>Website</label>
+      <input type="text" id="m-website" placeholder="https://yourproject.xyz" maxlength="80">
+      <div class="nb-sect">Message</div>
+      <label>Message to the community</label>
+      <textarea id="m-msg" placeholder="why you're locking..." maxlength="80"></textarea>
+      <div class="nb-err" id="m-err"></div>
+      <div class="nb-modal-btns">
+        <button onclick="closeModal()">Cancel</button>
+        <button class="nb-lock-btn" onclick="claimSlot()">Lock It In</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="nb-profile-overlay" id="nb-profile-overlay">
+    <div class="nb-profile" id="nb-profile-card"></div>
+  </div>
+  <div class="nb-toast" id="nb-toast">Slot locked. You are now NARA history.</div>
+</div>
+
+<script>
+const EMOJIS=['🔒','🚀','💎','🦁','🐺','🔥','⚡','👑','🌙','💀','🦊','🐉','🛡','⚔','🧠','🌊','🏆','💰','🎯','🦅','🐻','🌟','🍀','⛓','🔑'];
+const TIERS=[
+  {a:50, n:25,k:'t50', lbl:'50',  col:'var(--color-text-secondary)',bg:'var(--color-background-secondary)',border:'var(--color-border-secondary)'},
+  {a:100,n:25,k:'t100',lbl:'100', col:'var(--color-text-info)',     bg:'var(--color-background-info)',    border:'var(--color-border-info)'},
+  {a:250,n:20,k:'t250',lbl:'250', col:'#7F77DD',                    bg:'#EEEDFE',                         border:'#AFA9EC'},
+  {a:500,n:15,k:'t500',lbl:'500', col:'var(--color-text-warning)',  bg:'var(--color-background-warning)', border:'var(--color-border-warning)'},
+  {a:1000,n:15,k:'t1000',lbl:'1K',col:'var(--color-text-danger)',   bg:'var(--color-background-danger)',  border:'var(--color-border-danger)'}
+];
+const FAKES=[
+  {alias:'CryptoWolf',display:{type:'emoji',val:'🐺'},proj:'WolfDeFi',desc:'Yield optimizer on Base',twitter:'@cryptowolf',farcaster:'',website:'https://wolfdefi.xyz',msg:'early or never',m:1.2},
+  {alias:'Vault.eth',display:{type:'letter',val:'V'},proj:'',desc:'',twitter:'@vaulteth',farcaster:'@vaulteth',website:'',msg:'first 100 always win',m:1.0},
+  {alias:'naramaxi',display:{type:'letter',val:'N'},proj:'',desc:'',twitter:'@naramaxi',farcaster:'',website:'',msg:'this is the way',m:1.5},
+  {alias:'0x4f2a',display:{type:'letter',val:'0x'},proj:'',desc:'',twitter:'',farcaster:'',website:'',msg:'',m:1.0},
+  {alias:'DeFiGhost',display:{type:'emoji',val:'👻'},proj:'GhostVault',desc:'Anonymous DeFi tooling',twitter:'@defi_ghost',farcaster:'@defi_ghost',website:'https://ghostvault.fi',msg:'locked and loaded',m:1.3},
+  {alias:'basedleo',display:{type:'emoji',val:'🦁'},proj:'BasePad',desc:'Launchpad native to Base',twitter:'@basedleo',farcaster:'',website:'https://basepad.xyz',msg:'building on base',m:1.0},
+  {alias:'hodlgod',display:{type:'emoji',val:'👑'},proj:'',desc:'',twitter:'@hodlgod',farcaster:'',website:'',msg:'',m:1.1},
+  {alias:'NaraOG',display:{type:'letter',val:'OG'},proj:'',desc:'',twitter:'@naraog',farcaster:'@naraog',website:'',msg:'day 1 supporter',m:1.0},
+  {alias:'silentlock',display:{type:'emoji',val:'🔒'},proj:'',desc:'',twitter:'',farcaster:'',website:'',msg:'',m:1.0},
+  {alias:'epoch1',display:{type:'emoji',val:'⚡'},proj:'EpochDAO',desc:'Epoch-based governance',twitter:'@epoch1dao',farcaster:'@epoch1',website:'https://epochdao.xyz',msg:'let the vault grow',m:2.0},
+  {alias:'0x9c1b',display:{type:'letter',val:'Ξ'},proj:'',desc:'',twitter:'',farcaster:'',website:'',msg:'',m:1.0},
+  {alias:'defi_rat',display:{type:'emoji',val:'🐀'},proj:'RatFi',desc:'Meme-powered DeFi',twitter:'@defi_rat',farcaster:'',website:'',msg:'rat on base fr',m:1.4},
+  {alias:'moonvault',display:{type:'emoji',val:'🌙'},proj:'MoonVault',desc:'Auto-compounding vault',twitter:'@moonvault',farcaster:'@moonvault',website:'https://moonvault.finance',msg:'trust the math',m:1.2},
+  {alias:'stacksats',display:{type:'emoji',val:'💰'},proj:'',desc:'',twitter:'@stacksats',farcaster:'',website:'',msg:'nara over everything',m:1.0},
+  {alias:'vaultking',display:{type:'letter',val:'VK'},proj:'KingFi',desc:'Permissionless lending',twitter:'@vaultking',farcaster:'@vaultking',website:'https://kingfi.io',msg:'founding is forever',m:1.6},
+  {alias:'0xbeef',display:{type:'emoji',val:'🥩'},proj:'',desc:'',twitter:'',farcaster:'',website:'',msg:'',m:1.0},
+  {alias:'narapepe',display:{type:'emoji',val:'🐸'},proj:'PepeVault',desc:'Frog-themed yield',twitter:'@narapepe',farcaster:'',website:'',msg:'ribbit',m:1.1},
+  {alias:'baseddev',display:{type:'emoji',val:'🛠'},proj:'BaseTools',desc:'Dev tooling for Base',twitter:'@baseddev',farcaster:'@baseddev',website:'https://basetools.dev',msg:'i read the code',m:1.3},
+  {alias:'locksmith',display:{type:'emoji',val:'🔑'},proj:'',desc:'',twitter:'@locksmitheth',farcaster:'',website:'',msg:'no key no entry',m:1.0},
+  {alias:'epochfarm',display:{type:'emoji',val:'🌾'},proj:'EpochFarm',desc:'Epoch-gated farming',twitter:'@epochfarm',farcaster:'@epochfarm',website:'https://epochfarm.xyz',msg:'compounding daily',m:1.5},
+  {alias:'genesis',display:{type:'letter',val:'GEN'},proj:'',desc:'',twitter:'@genesis0x',farcaster:'',website:'',msg:'slot 1 was taken',m:1.0},
+  {alias:'vaultrat',display:{type:'emoji',val:'🐭'},proj:'',desc:'',twitter:'@vaultrat',farcaster:'',website:'',msg:'in the vault forever',m:1.2},
+  {alias:'LockGod',display:{type:'emoji',val:'⛓'},proj:'LockProtocol',desc:'Time-locked incentives',twitter:'@lockgod',farcaster:'@lockgod',website:'https://lockprotocol.xyz',msg:'OG locker',m:1.8},
+  {alias:'NaraFan',display:{type:'emoji',val:'💎'},proj:'',desc:'',twitter:'@narafan',farcaster:'',website:'',msg:'locked my savings',m:1.0},
+  {alias:'0xd33z',display:{type:'letter',val:'Ð'},proj:'',desc:'',twitter:'',farcaster:'',website:'',msg:'',m:1.0},
+  {alias:'zkLeo',display:{type:'emoji',val:'🧠'},proj:'zkBase',desc:'ZK proofs on Base',twitter:'@zkleo',farcaster:'@zkleo',website:'https://zkbase.io',msg:'',m:1.3},
+  {alias:'zeroday',display:{type:'emoji',val:'🎯'},proj:'',desc:'',twitter:'@zeroday0x',farcaster:'',website:'',msg:'first mover advantage',m:1.1},
+  {alias:'0x7a3c',display:{type:'letter',val:'?'},proj:'',desc:'',twitter:'',farcaster:'',website:'',msg:'',m:1.0},
+];
+
+let slots=[];
+TIERS.forEach(t=>{for(let i=0;i<t.n;i++)slots.push({tier:t})});
+for(let i=slots.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[slots[i],slots[j]]=[slots[j],slots[i]];}
+const preClaim=new Set();while(preClaim.size<28)preClaim.add(Math.floor(Math.random()*100));
+let fi=0;
+slots=slots.map((s,i)=>{
+  const base={...s,num:i+1,claimed:false,alias:'',amount:0,msg:'',proj:'',desc:'',twitter:'',farcaster:'',website:'',display:{type:'letter',val:''}};
+  if(preClaim.has(i)&&fi<FAKES.length){
+    const f=FAKES[fi++];
+    return{...base,claimed:true,alias:f.alias,amount:Math.round(s.tier.a*f.m),msg:f.msg,proj:f.proj,desc:f.desc,twitter:f.twitter,farcaster:f.farcaster,website:f.website,display:f.display};
+  }
+  return base;
+});
+
+let activeSlot=null,activeTab='letter',selectedEmoji='';
+
+function slotsLeft(){return 100-slots.filter(s=>s.claimed).length;}
+function getInitials(n){return n.match(/^0x/i)?'0x':n.split(/[\s._-]/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase()||'??'}
+function lockSize(k){return{t50:18,t100:20,t250:22,t500:24,t1000:26}[k]||20;}
+function lockOpenSVG(sz,col){return`<svg width="${sz}" height="${Math.round(sz*1.15)}" viewBox="0 0 20 24" fill="none" style="color:${col}"><rect x="2" y="10" width="16" height="12" rx="2.5" fill="currentColor" opacity="0.12"/><rect x="2" y="10" width="16" height="12" rx="2.5" stroke="currentColor" stroke-width="1.3"/><path d="M6 10V7a4 4 0 0 1 8 0" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="10" cy="16" r="1.8" fill="currentColor" opacity="0.4"/></svg>`;}
+
+function getDisplayHTML(display,tier,forSlot){
+  if(!display||!display.val)return lockOpenSVG(lockSize(tier.k),tier.col);
+  const{type,val}=display;
+  if(type==='image'){
+    const sz=forSlot?'100%':'38px';
+    return`<img src="${val}" style="width:${sz};height:${sz};object-fit:cover;border-radius:${forSlot?'5px':'50%'}" onerror="this.style.display='none'">`;
+  }
+  const fs=forSlot?(val.length===1?'22px':val.length===2?'16px':'12px'):(val.length===1?'24px':'18px');
+  return`<span style="font-size:${fs};line-height:1;font-weight:500;color:${tier.col}">${val}</span>`;
+}
+
+function renderSlot(s,i){
+  const div=document.createElement('div');
+  div.className=`nb-slot ${s.tier.k} ${s.claimed?'claimed':'unclaimed'}`;
+  if(s.claimed){
+    const inner=s.display&&s.display.val?getDisplayHTML(s.display,s.tier,true):lockOpenSVG(lockSize(s.tier.k),s.tier.col);
+    div.innerHTML=`<div class="nb-slot-n">#${String(s.num).padStart(2,'0')}</div><div class="nb-slot-ico" style="margin-top:8px">${inner}</div><div class="nb-slot-lbl" style="margin-top:3px">${s.proj||s.alias}</div>`;
+    div.addEventListener('click',()=>showProfile(i));
+  }else{
+    div.innerHTML=`<div class="nb-slot-n">#${String(s.num).padStart(2,'0')}</div><div class="nb-slot-ico">${lockOpenSVG(lockSize(s.tier.k),s.tier.col)}</div><div class="nb-slot-lbl">${s.tier.lbl}</div>`;
+    div.addEventListener('click',()=>openModal(i));
+  }
+  return div;
+}
+
+function renderGrid(){
+  const grid=document.getElementById('nb-grid');
+  grid.innerHTML='';
+  slots.forEach((s,i)=>grid.appendChild(renderSlot(s,i)));
+}
+
+function updateStats(){
+  const claimed=slots.filter(s=>s.claimed).length;
+  const locked=slots.filter(s=>s.claimed).reduce((a,s)=>a+s.amount,0);
+  document.getElementById('s-claimed').textContent=claimed;
+  document.getElementById('s-locked').textContent=locked.toLocaleString();
+  document.getElementById('s-left').textContent=100-claimed;
+  const pct=Math.round(claimed/100*100);
+  document.getElementById('prog-fill').style.width=pct+'%';
+  document.getElementById('prog-txt').textContent=claimed+' / 100 founding slots claimed';
+  document.getElementById('prog-pct').textContent=pct+'%';
+}
+
+function buildEmojiGrid(){
+  const grid=document.getElementById('emoji-grid');
+  EMOJIS.forEach(e=>{
+    const btn=document.createElement('div');
+    btn.className='nb-emoji-btn';btn.textContent=e;
+    btn.onclick=()=>{selectedEmoji=e;document.querySelectorAll('.nb-emoji-btn').forEach(b=>b.classList.remove('sel'));btn.classList.add('sel');document.getElementById('m-emoji-custom').value='';updatePreview();};
+    grid.appendChild(btn);
+  });
+}
+
+function onEmojiCustom(){selectedEmoji=document.getElementById('m-emoji-custom').value;document.querySelectorAll('.nb-emoji-btn').forEach(b=>b.classList.remove('sel'));updatePreview();}
+
+function switchTab(tab){
+  activeTab=tab;
+  document.querySelectorAll('.nb-dtab').forEach((el,i)=>el.classList.toggle('active',['letter','emoji','image'][i]===tab));
+  document.querySelectorAll('.nb-display-panel').forEach((el,i)=>el.classList.toggle('active',['letter','emoji','image'][i]===tab));
+  updatePreview();
+}
+
+function getCurrentDisplay(){
+  if(activeTab==='letter')return{type:'letter',val:document.getElementById('m-char').value.trim()};
+  if(activeTab==='emoji')return{type:'emoji',val:selectedEmoji||document.getElementById('m-emoji-custom').value};
+  if(activeTab==='image')return{type:'image',val:document.getElementById('m-imgurl').value.trim()};
+  return{type:'letter',val:''};
+}
+
+function updatePreview(){
+  if(activeSlot===null)return;
+  const s=slots[activeSlot];
+  const disp=getCurrentDisplay();
+  const preview=document.getElementById('preview-slot');
+  preview.style.background=s.tier.bg;
+  preview.style.border=`1.5px solid ${s.tier.border}`;
+  preview.style.borderRadius='7px';
+  preview.style.width='48px';preview.style.height='48px';
+  preview.innerHTML=disp.val?getDisplayHTML(disp,s.tier,false):lockOpenSVG(22,s.tier.col);
+  const alias=document.getElementById('m-alias').value.trim();
+  document.getElementById('preview-label').textContent=alias||'Your slot preview';
+}
+
+function checkAdjacent(idx){
+  const neighbors=[idx-1,idx+1].filter(n=>n>=0&&n<100&&slots[n].claimed);
+  if(!neighbors.length)return;
+  const hint=document.getElementById('adj-hint');
+  const names=neighbors.map(n=>slots[n].alias||`#${slots[n].num}`);
+  hint.textContent=`Adjacent to ${names.join(' & ')} — buy slots in a row to spell words across the board`;
+  hint.style.display='block';
+}
+
+function openModal(idx){
+  activeSlot=idx;const s=slots[idx];activeTab='letter';selectedEmoji='';
+  document.getElementById('modal-ttl').textContent=`Claim Slot #${String(s.num).padStart(2,'0')}`;
+  document.getElementById('modal-sub').textContent=`Tier: ${s.tier.lbl} NARA · min ${s.tier.a.toLocaleString()} NARA · your mark lives here forever`;
+  document.getElementById('adj-hint').style.display='none';
+  ['m-alias','m-proj','m-desc','m-twitter','m-farcaster','m-website','m-msg','m-char','m-imgurl','m-emoji-custom'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('m-amount').value=s.tier.a;
+  document.getElementById('m-amount').min=s.tier.a;
+  document.getElementById('m-err').textContent='';
+  document.querySelectorAll('.nb-emoji-btn').forEach(b=>b.classList.remove('sel'));
+  switchTab('letter');checkAdjacent(idx);updatePreview();
+  document.getElementById('nb-overlay').classList.add('open');
+}
+function closeModal(){document.getElementById('nb-overlay').classList.remove('open');activeSlot=null;}
+
+function claimSlot(){
+  if(activeSlot===null)return;
+  const alias=document.getElementById('m-alias').value.trim();
+  const amount=parseInt(document.getElementById('m-amount').value)||0;
+  const s=slots[activeSlot];
+  const err=document.getElementById('m-err');
+  if(!alias){err.textContent='Enter your alias to claim this slot';return;}
+  if(amount<s.tier.a){err.textContent=`Min amount is ${s.tier.a.toLocaleString()} NARA`;return;}
+  const idx=activeSlot;
+  slots[idx]={...s,claimed:true,alias,amount,display:getCurrentDisplay(),
+    msg:document.getElementById('m-msg').value.trim(),
+    proj:document.getElementById('m-proj').value.trim(),
+    desc:document.getElementById('m-desc').value.trim(),
+    twitter:document.getElementById('m-twitter').value.trim(),
+    farcaster:document.getElementById('m-farcaster').value.trim(),
+    website:document.getElementById('m-website').value.trim()
+  };
+  closeModal();
+  const grid=document.getElementById('nb-grid');
+  grid.replaceChild(renderSlot(slots[idx],idx),grid.children[idx]);
+  updateStats();prependTicker(alias,amount,s.num,slots[idx].display);
+  const toast=document.getElementById('nb-toast');toast.style.display='block';
+  setTimeout(()=>toast.style.display='none',3500);
+  setTimeout(()=>showProfile(idx),200);
+}
+
+function buildTweetText(s){
+  const left=slotsLeft();
+  return`🔒 Just locked ${s.amount.toLocaleString()} $NARA as Founding Locker #${s.num} @NARA_protocol\n\n100 slots. Only ${left} left.\n\nAre you in?`;
+}
+
+function showProfile(idx){
+  const s=slots[idx];const t=s.tier;
+  const tweet=buildTweetText(s);
+  let avatarInner='';
+  if(s.display&&s.display.val){
+    avatarInner=s.display.type==='image'
+      ?`<img src="${s.display.val}" style="width:44px;height:44px;object-fit:cover;border-radius:50%" onerror="this.style.display='none'">`
+      :`<span style="font-size:22px">${s.display.val}</span>`;
+  }else{
+    avatarInner=`<span style="font-size:14px;font-weight:500;color:${t.col}">${getInitials(s.alias)}</span>`;
+  }
+  let links='';
+  if(s.twitter)links+=`<a class="nb-profile-link" href="https://twitter.com/${s.twitter.replace('@','')}" target="_blank">${s.twitter.startsWith('@')?s.twitter:'@'+s.twitter} · X</a>`;
+  if(s.farcaster)links+=`<a class="nb-profile-link" href="https://warpcast.com/${s.farcaster.replace('@','')}" target="_blank">${s.farcaster.startsWith('@')?s.farcaster:'@'+s.farcaster} · Farcaster</a>`;
+  if(s.website)links+=`<a class="nb-profile-link" href="${s.website}" target="_blank">${s.website.replace(/https?:\/\//,'')}</a>`;
+  document.getElementById('nb-profile-card').innerHTML=`
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <div class="nb-profile-badge" style="margin:0">
+        <div class="nb-profile-avatar" style="background:${t.bg}">${avatarInner}</div>
+        <div class="nb-profile-id">
+          <div class="nb-profile-alias">${s.alias}</div>
+          <div class="nb-profile-slot">Founding Locker #${String(s.num).padStart(2,'0')}</div>
+        </div>
+      </div>
+      <span class="nb-profile-tier" style="color:${t.col};border-color:${t.border};background:${t.bg}">${t.lbl} tier</span>
+    </div>
+    ${s.proj?`<div class="nb-profile-project"><div class="nb-profile-proj-name">${s.proj}</div><div class="nb-profile-proj-desc">${s.desc||'—'}</div></div>`:''}
+    ${s.msg?`<div class="nb-profile-msg">"${s.msg}"</div>`:''}
+    <div class="nb-profile-locked">Locked <b>${s.amount.toLocaleString()} NARA</b></div>
+    ${links?`<div class="nb-profile-links">${links}</div>`:''}
+    <div style="font-size:9px;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:5px">Share tweet preview</div>
+    <div class="nb-tweet-preview">${tweet}</div>
+    <div class="nb-profile-btns">
+      <button onclick="closeProfile()">Close</button>
+      <button class="nb-share-btn" onclick="doShare(${idx})">Post to X ↗</button>
+    </div>`;
+  document.getElementById('nb-profile-overlay').classList.add('open');
+}
+function closeProfile(){document.getElementById('nb-profile-overlay').classList.remove('open');}
+function doShare(idx){openLink('https://twitter.com/intent/tweet?text='+encodeURIComponent(buildTweetText(slots[idx])));}
+
+function buildTicker(){
+  const claimed=slots.filter(s=>s.claimed);
+  const items=claimed.map(s=>{const icon=s.display&&s.display.val&&s.display.type!=='image'?s.display.val+' ':'';return`<span class="nb-ticker-item">${icon}<b>${s.proj||s.alias}</b> locked slot #${String(s.num).padStart(2,'0')} · ${s.amount.toLocaleString()} NARA &nbsp;·&nbsp; </span>`;});
+  document.getElementById('nb-ticker').innerHTML=[...items,...items].join('');
+}
+function prependTicker(alias,amount,num,display){
+  const t=document.getElementById('nb-ticker');
+  const span=document.createElement('span');span.className='nb-ticker-item';
+  const icon=display&&display.val&&display.type!=='image'?display.val+' ':'';
+  span.innerHTML=`${icon}<b>${alias}</b> just claimed slot #${String(num).padStart(2,'0')} · ${amount.toLocaleString()} NARA &nbsp;·&nbsp; `;
+  t.prepend(span);
+}
+document.getElementById('nb-overlay').addEventListener('click',function(e){if(e.target===this)closeModal();});
+document.getElementById('nb-profile-overlay').addEventListener('click',function(e){if(e.target===this)closeProfile();});
+buildEmojiGrid();renderGrid();updateStats();buildTicker();
+</script>
