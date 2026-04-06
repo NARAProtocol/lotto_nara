@@ -400,9 +400,10 @@ button:focus-visible {
 /* ── Main 2-col layout ── */
 .nb-main-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr);
   gap: 16px;
   margin-bottom: 16px;
+  align-items: start;
 }
 
 /* ── Panels ── */
@@ -421,6 +422,53 @@ button:focus-visible {
   text-transform: uppercase;
   color: var(--muted);
   margin: 0 0 16px;
+}
+
+.nb-panel-headline {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.nb-panel-intro {
+  margin: 0;
+  max-width: 38rem;
+  font-size: 12px;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  line-height: 1.6;
+}
+
+.nb-fact-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0 0 16px;
+}
+
+.nb-fact-card {
+  border-radius: 14px;
+  border: 1px solid rgba(25, 22, 18, 0.08);
+  background: rgba(255, 255, 255, 0.68);
+  padding: 12px;
+}
+
+.nb-fact-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.nb-fact-value {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
 }
 
 .nb-inner-card {
@@ -468,6 +516,162 @@ button:focus-visible {
   font-size: 11px;
   color: var(--muted);
   line-height: 1.5;
+}
+
+.nb-button-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.nb-button-row .nb-btn-primary,
+.nb-button-row .nb-btn-secondary {
+  margin-bottom: 0;
+}
+
+.nb-rule-disclosure {
+  margin-top: 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(25, 22, 18, 0.08);
+  background: rgba(255, 255, 255, 0.6);
+  overflow: hidden;
+}
+
+.nb-rule-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  cursor: pointer;
+  list-style: none;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+.nb-rule-summary::-webkit-details-marker {
+  display: none;
+}
+
+.nb-rule-summary::after {
+  content: "+";
+  font-size: 16px;
+  color: var(--muted);
+}
+
+.nb-rule-disclosure[open] .nb-rule-summary::after {
+  content: "-";
+}
+
+.nb-rule-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  padding: 0 16px 16px;
+}
+
+.nb-rule-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(25, 22, 18, 0.08);
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.nb-rule-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: rgba(24, 119, 242, 0.12);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.nb-rule-title {
+  margin: 0 0 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.nb-rule-copy {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.nb-entry-topline {
+  margin-bottom: 14px;
+}
+
+.nb-entry-caption {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.nb-status-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.nb-status-card {
+  border-radius: 14px;
+  border: 1px solid rgba(25, 22, 18, 0.08);
+  background: rgba(255, 255, 255, 0.68);
+  padding: 12px;
+}
+
+.nb-status-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.nb-status-value {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.nb-empty-entry {
+  border-radius: 16px;
+  border: 1px dashed rgba(25, 22, 18, 0.12);
+  background: rgba(255, 255, 255, 0.5);
+  padding: 22px 18px;
+}
+
+.nb-empty-entry-title {
+  margin: 10px 0 6px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.nb-empty-entry-text {
+  margin: 0;
+  max-width: 32ch;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--muted);
 }
 
 .nb-soft-guide {
@@ -800,6 +1004,7 @@ button:focus-visible {
 
 .nb-draw-explainer {
   flex-basis: 100%;
+  max-width: 40rem;
   margin: 0;
   font-size: 11px;
   line-height: 1.6;
@@ -1071,6 +1276,14 @@ button:focus-visible {
     gap: 14px;
   }
 
+  .nb-panel-headline {
+    flex-direction: column;
+  }
+
+  .nb-fact-grid,
+  .nb-button-row,
+  .nb-rule-grid,
+  .nb-status-grid,
   .nb-soft-guide {
     grid-template-columns: 1fr;
   }
