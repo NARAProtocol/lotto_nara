@@ -18,6 +18,7 @@
   "dependencies": {
     "@rainbow-me/rainbowkit": "latest",
     "@tanstack/react-query": "latest",
+    "buffer": "^6.0.3",
     "react": "latest",
     "react-dom": "latest",
     "viem": "latest",
