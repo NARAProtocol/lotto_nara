@@ -97,7 +97,8 @@ function collectErrorText(error: unknown): string {
 }
 
 function describeTxError(label: string, error: unknown): string {
-  const raw = collectErrorText(error).toLowerCase();
+  const rawText = collectErrorText(error);
+  const raw = rawText.toLowerCase();
   if (/user rejected|user denied|action_rejected|denied transaction/.test(raw)) {
     return `${label} was cancelled in your wallet.`;
   }
@@ -110,7 +111,13 @@ function describeTxError(label: string, error: unknown): string {
   if (/erc20insufficientallowance|insufficient allowance/.test(raw)) {
     return "Approval amount is too low. Approve again.";
   }
-  const first = collectErrorText(error).split("\n")[0];
+  if (/epochstale|failed_would_revert|would revert/.test(raw)) {
+    return "The pool timer is behind live time. Run Sync Engine First, then try again.";
+  }
+  if (/smart transaction failed|transaction receipt with hash .* could not be found|could not be found|originaltransactionstatus|cancelled|canceled/.test(raw)) {
+    return "The wallet dropped this request before Base accepted it. Sync the engine and retry.";
+  }
+  const first = rawText.split("\n")[0];
   return first || `${label} failed. Try again.`;
 }
 
@@ -213,7 +220,7 @@ export default function App() {
 
   const [depositAmount, setDepositAmount] = useState("");
   const [flash, setFlash] = useState<Flash | null>(null);
-  const [txStep, setTxStep] = useState<"idle" | "approving" | "depositing" | "withdrawing" | "drawing" | "claiming" | "harvesting">("idle");
+  const [txStep, setTxStep] = useState<"idle" | "approving" | "syncing" | "depositing" | "withdrawing" | "drawing" | "claiming" | "harvesting">("idle");
   const [drawHistory, setDrawHistory] = useState<DrawRecord[]>([]);
   const [copiedAddr, setCopiedAddr] = useState<string | null>(null);
 
@@ -301,7 +308,12 @@ export default function App() {
     functionName: "unlockFeeWei",
   });
 
-  // Use epochState to get current epoch reliably
+  const currentEpochRead = useReadContract({
+    address: NARA_ENGINE_ADDRESS,
+    abi: engineAbi,
+    functionName: "currentEpoch",
+  });
+
   const epochStateRead = useReadContract({
     address: NARA_ENGINE_ADDRESS,
     abi: engineAbi,
@@ -333,7 +345,11 @@ export default function App() {
   // Derived values
 
   const epochStateData = epochStateRead.data as any;
-  const currentEpoch = Number(epochStateData?.[0] ?? epochStateData?.epoch ?? 0n);
+  const liveEpoch = Number((currentEpochRead.data ?? 0n) as bigint);
+  const settledEpoch = Number(epochStateData?.[0] ?? epochStateData?.epoch ?? 0n);
+  const currentEpoch = liveEpoch > 0 ? liveEpoch : settledEpoch;
+  const backlog = Math.max(0, currentEpoch - settledEpoch);
+  const engineSyncRequired = backlog > 0;
 
   const potNara = (potNaraRead.data ?? 0n) as bigint;
   const potEth = (potEthRead.data ?? 0n) as bigint;
@@ -351,9 +367,9 @@ export default function App() {
   const userWeight = isParticipant ? BigInt(pData?.weight ?? pData?.[3] ?? 0n) : 0n;
   const activationEpoch = isParticipant ? Number(pData?.activationEpoch ?? pData?.[2] ?? 0n) : 0;
   const unlockEpoch = isParticipant ? activationEpoch + Number(lockDurationEpochs) : 0;
-  const entryStartsInEpochs = isParticipant ? Math.max(0, activationEpoch - currentEpoch) : 0;
+  const entryStartsInEpochs = isParticipant ? Math.max(0, activationEpoch - settledEpoch) : 0;
   const entryIsLive = isParticipant && entryStartsInEpochs === 0;
-  const unlocksInEpochs = isParticipant ? Math.max(0, unlockEpoch - currentEpoch) : 0;
+  const unlocksInEpochs = isParticipant ? Math.max(0, unlockEpoch - settledEpoch) : 0;
   const participantAmount = isParticipant ? BigInt(pData?.weight ?? 0n) : 0n; // weight acts as proxy
 
   const winningsNara = (winningsNaraRead.data ?? 0n) as bigint;
@@ -371,13 +387,13 @@ export default function App() {
   const drawReady = pendingDrawRequestId === 0n
     && participantCount > 0
     && drawFrequencyEpochs > 0
-    && currentEpoch >= lastDrawEpoch + drawFrequencyEpochs;
+    && settledEpoch >= lastDrawEpoch + drawFrequencyEpochs;
 
   const drawPending = pendingDrawRequestId !== 0n;
   const nextDrawEpoch = drawFrequencyEpochs > 0 ? lastDrawEpoch + drawFrequencyEpochs : 0;
 
   const epochsUntilDraw = drawFrequencyEpochs > 0
-    ? Math.max(0, nextDrawEpoch - currentEpoch)
+    ? Math.max(0, nextDrawEpoch - settledEpoch)
     : 0;
 
   const canDeposit = !isParticipant
@@ -386,10 +402,10 @@ export default function App() {
     && participantCount < maxParticipants;
 
   const lockProgressPct = isParticipant && lockDurationEpochs > 0n
-    ? Math.min(100, Math.round(((currentEpoch - activationEpoch) / Number(lockDurationEpochs)) * 100))
+    ? Math.min(100, Math.max(0, Math.round(((settledEpoch - activationEpoch) / Number(lockDurationEpochs)) * 100)))
     : 0;
 
-  const canWithdraw = isParticipant && currentEpoch >= unlockEpoch;
+  const canWithdraw = isParticipant && settledEpoch >= unlockEpoch;
 
   const previewWeight = (previewWeightRead.data ?? 0n) as bigint;
   const previewOdds = activeTotalWeight > 0n && previewWeight > 0n
@@ -457,6 +473,28 @@ export default function App() {
     queryClient.invalidateQueries();
   }, [queryClient]);
 
+  const refreshEpochStatus = useCallback(async () => {
+    await Promise.allSettled([
+      currentEpochRead.refetch(),
+      epochStateRead.refetch(),
+      participantCountRead.refetch(),
+      participantDataRead.refetch(),
+      lastDrawEpochRead.refetch(),
+      pendingDrawRequestIdRead.refetch(),
+      activeTotalWeightRead.refetch(),
+    ]);
+    queryClient.invalidateQueries();
+  }, [
+    activeTotalWeightRead,
+    currentEpochRead,
+    epochStateRead,
+    lastDrawEpochRead,
+    participantCountRead,
+    participantDataRead,
+    pendingDrawRequestIdRead,
+    queryClient,
+  ]);
+
   const ensureWalletReady = useCallback((action: string) => {
     if (!isConnected) {
       setFlash({ tone: "error", text: `Connect your wallet to ${action}.` });
@@ -493,8 +531,42 @@ export default function App() {
     }
   };
 
+  const handleSyncEngine = async () => {
+    if (!ensureWalletReady("sync the pool timer") || !publicClient || !engineSyncRequired) return;
+    setTxStep("syncing");
+    setFlash({ tone: "neutral", text: `Syncing ${backlog} epoch${backlog === 1 ? "" : "s"} so joins settle cleanly.` });
+    try {
+      const hash = backlog > 1
+        ? await writeContractAsync({
+            address: NARA_ENGINE_ADDRESS,
+            abi: engineAbi,
+            functionName: "advanceEpochs",
+            args: [BigInt(backlog)],
+          })
+        : await writeContractAsync({
+            address: NARA_ENGINE_ADDRESS,
+            abi: engineAbi,
+            functionName: "advanceEpoch",
+          });
+      await publicClient.waitForTransactionReceipt({ hash });
+      await refreshEpochStatus();
+      setFlash({ tone: "success", text: "Pool timer synced. You can join now." });
+    } catch (err) {
+      setFlash({ tone: "error", text: describeTxError("Sync", err) });
+    } finally {
+      setTxStep("idle");
+    }
+  };
+
   const handleDeposit = async () => {
     if (!ensureWalletReady("enter the draw") || !depositAmount || !lockFeeWeiRead.data) return;
+    if (engineSyncRequired) {
+      setFlash({
+        tone: "error",
+        text: `The pool timer is ${backlog} epoch${backlog === 1 ? "" : "s"} behind live time. Run Sync Engine First, then join.`
+      });
+      return;
+    }
     setTxStep("depositing");
     setFlash({ tone: "neutral", text: "Step 2 of 2 - Joining the prize pool. Confirm in your wallet." });
     try {
@@ -784,6 +856,12 @@ export default function App() {
                   Step 1 of 2: Approve NARA
                 </div>
               )}
+              {txStep === "syncing" && (
+                <div className="nb-step-indicator">
+                  <span className="nb-step-dot" />
+                  Ready Check: Sync Pool Timer
+                </div>
+              )}
               {txStep === "depositing" && (
                 <div className="nb-step-indicator">
                   <span className="nb-step-dot" />
@@ -833,8 +911,16 @@ export default function App() {
                 </div>
               )}
 
+              {engineSyncRequired && (
+                <div className="nb-soft-note">
+                  Sync needed first. The pool timer is {backlog} epoch{backlog === 1 ? "" : "s"} behind live time. Run one quick sync before you join so MetaMask can price the transaction cleanly.
+                </div>
+              )}
+
               <p className="nb-wallet-action-note">
-                You will see 2 wallet popups: approve, then join.
+                {engineSyncRequired
+                  ? "Approve anytime, then run Sync Engine First. After that, Join Pool will work normally."
+                  : "You will see 2 wallet popups: approve, then join."}
               </p>
 
               <div className="nb-button-row">
@@ -858,18 +944,24 @@ export default function App() {
                 <button
                   type="button"
                   className="nb-btn-primary"
-                  onClick={handleDeposit}
-                  disabled={isBusy || !isApproved || !canDeposit || amountWei === 0n}
-                  aria-disabled={!canDeposit || !isApproved || isBusy}
-                  aria-busy={txStep === "depositing"}
+                  onClick={engineSyncRequired ? handleSyncEngine : handleDeposit}
+                  disabled={engineSyncRequired ? isBusy || !publicClient : isBusy || !isApproved || !canDeposit || amountWei === 0n}
+                  aria-disabled={engineSyncRequired ? isBusy || !publicClient : !canDeposit || !isApproved || isBusy}
+                  aria-busy={txStep === "syncing" || txStep === "depositing"}
                 >
-                  {txStep === "depositing" ? (
+                  {txStep === "syncing" ? (
+                    <>
+                      <span className="nb-spinner" aria-hidden="true" />
+                      <span className="nb-sr-only">Syncing...</span>
+                      Syncing...
+                    </>
+                  ) : txStep === "depositing" ? (
                     <>
                       <span className="nb-spinner" aria-hidden="true" />
                       <span className="nb-sr-only">Joining...</span>
                       Joining...
                     </>
-                  ) : "Join Pool"}
+                  ) : engineSyncRequired ? "Sync Engine First" : "Join Pool"}
                 </button>
               </div>
             </>
