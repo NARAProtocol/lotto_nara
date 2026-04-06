@@ -1,0 +1,9 @@
+{
+  "redirects": [
+    {
+      "source": "/",
+      "destination": "/lotto",
+      "permanent": false
+    }
+  ]
+}
