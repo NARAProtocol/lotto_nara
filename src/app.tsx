@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+﻿import { useState, useEffect, useCallback } from "react";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import {
   useAccount,
@@ -10,6 +10,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { formatEther, parseEther, type Log } from "viem";
 
 import {
+  NARA_CHAIN_ID,
+  NARA_CHAIN_NAME,
   NARA_TOKEN_ADDRESS,
   NARA_LOTTO_POOL_ADDRESS,
   NARA_ENGINE_ADDRESS,
@@ -18,7 +20,7 @@ import {
   engineAbi,
 } from "./shared/nara";
 
-// ── Types ────────────────────────────────────────────────────────────────────
+// â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 type FlashTone = "neutral" | "error" | "success" | "winner" | "draw-ready";
 
@@ -35,7 +37,7 @@ type DrawRecord = {
   blockNumber: bigint;
 };
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function shortAddress(addr: string): string {
   return addr.slice(0, 6) + "..." + addr.slice(-4);
@@ -110,7 +112,7 @@ function describeTxError(label: string, error: unknown): string {
   return first || `${label} failed. Try again.`;
 }
 
-// ── Components ───────────────────────────────────────────────────────────────
+// â”€â”€ Components â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function CaretIcon() {
   return (
@@ -134,7 +136,7 @@ function WalletHeroButton() {
           return <button type="button" className="nb-wallet-trigger" onClick={openConnectModal}>Connect Wallet</button>;
         }
         if (chain.unsupported) {
-          return <button type="button" className="nb-wallet-trigger" onClick={openChainModal}>Switch to Base</button>;
+          return <button type="button" className="nb-wallet-trigger" onClick={openChainModal}>{`Switch to ${NARA_CHAIN_NAME}`}</button>;
         }
         return (
           <button type="button" className="nb-wallet-hero-btn" onClick={openAccountModal}>
@@ -153,10 +155,56 @@ function WalletHeroButton() {
   );
 }
 
-// ── Main App ─────────────────────────────────────────────────────────────────
+function WalletActionButton({
+  className = "nb-btn-primary",
+  connectLabel = "Connect Wallet",
+  switchLabel = `Switch to ${NARA_CHAIN_NAME}`,
+}: {
+  className?: string;
+  connectLabel?: string;
+  switchLabel?: string;
+}) {
+  return (
+    <ConnectButton.Custom>
+      {({ mounted, authenticationStatus, chain, openConnectModal, openChainModal }) => {
+        const ready = mounted && authenticationStatus !== "loading";
+        const label = !ready ? "Loading..." : chain?.unsupported ? switchLabel : connectLabel;
+        const onClick = chain?.unsupported ? openChainModal : openConnectModal;
+
+        return (
+          <button type="button" className={className} onClick={onClick} disabled={!ready}>
+            {label}
+          </button>
+        );
+      }}
+    </ConnectButton.Custom>
+  );
+}
+
+function WalletSetupCard({
+  title,
+  body,
+  connectLabel = "Connect Wallet",
+  switchLabel = `Switch to ${NARA_CHAIN_NAME}`,
+}: {
+  title: string;
+  body: string;
+  connectLabel?: string;
+  switchLabel?: string;
+}) {
+  return (
+    <div className="nb-wallet-help">
+      <p className="nb-wallet-help-title">{title}</p>
+      <p className="nb-wallet-help-text">{body}</p>
+      <WalletActionButton connectLabel={connectLabel} switchLabel={switchLabel} />
+    </div>
+  );
+}
+
+// â”€â”€ Main App â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export default function App() {
-  const { address, isConnected } = useAccount();
+  const { address, chainId, isConnected } = useAccount();
   const queryClient = useQueryClient();
   const publicClient = usePublicClient();
   const { writeContractAsync } = useWriteContract();
@@ -167,7 +215,9 @@ export default function App() {
   const [drawHistory, setDrawHistory] = useState<DrawRecord[]>([]);
   const [copiedAddr, setCopiedAddr] = useState<string | null>(null);
 
-  // ── Contract reads ────────────────────────────────────────────────────────
+  const isWrongNetwork = Boolean(isConnected && chainId != null && chainId !== NARA_CHAIN_ID);
+
+  // â”€â”€ Contract reads â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const potNaraRead = useReadContract({
     address: NARA_LOTTO_POOL_ADDRESS,
@@ -278,7 +328,7 @@ export default function App() {
     query: { enabled: amountWei > 0n && lockDurationEpochs > 0n },
   });
 
-  // ── Derived values ────────────────────────────────────────────────────────
+  // â”€â”€ Derived values â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const epochStateData = epochStateRead.data as any;
   const currentEpoch = Number(epochStateData?.[0] ?? epochStateData?.epoch ?? 0n);
@@ -318,9 +368,10 @@ export default function App() {
     && currentEpoch >= lastDrawEpoch + drawFrequencyEpochs;
 
   const drawPending = pendingDrawRequestId !== 0n;
+  const nextDrawEpoch = drawFrequencyEpochs > 0 ? lastDrawEpoch + drawFrequencyEpochs : 0;
 
   const epochsUntilDraw = drawFrequencyEpochs > 0
-    ? Math.max(0, (lastDrawEpoch + drawFrequencyEpochs) - currentEpoch)
+    ? Math.max(0, nextDrawEpoch - currentEpoch)
     : 0;
 
   const canDeposit = !isParticipant
@@ -339,7 +390,7 @@ export default function App() {
     ? Number(((previewWeight) * 10000n) / (activeTotalWeight + previewWeight)) / 100
     : 0;
 
-  // ── Draw history fetch ────────────────────────────────────────────────────
+  // â”€â”€ Draw history fetch â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const fetchDrawHistory = useCallback(async () => {
     if (!publicClient) return;
@@ -376,26 +427,40 @@ export default function App() {
         });
       setDrawHistory(records);
     } catch {
-      // silently fail — no history to show
+      // silently fail â€” no history to show
     }
   }, [publicClient]);
 
-  // useEffect(() => {
-  //   fetchDrawHistory();
-  // }, [fetchDrawHistory]);
+  useEffect(() => {
+    void fetchDrawHistory();
+  }, [fetchDrawHistory]);
 
-  // ── Invalidate queries helper ─────────────────────────────────────────────
+  // â”€â”€ Invalidate queries helper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const invalidateLotto = useCallback(() => {
     queryClient.invalidateQueries();
   }, [queryClient]);
 
-  // ── Tx handlers ──────────────────────────────────────────────────────────
+  const ensureWalletReady = useCallback((action: string) => {
+    if (!isConnected) {
+      setFlash({ tone: "error", text: `Connect your wallet to ${action}.` });
+      return false;
+    }
+
+    if (isWrongNetwork) {
+      setFlash({ tone: "error", text: `Switch your wallet to ${NARA_CHAIN_NAME} before you ${action}.` });
+      return false;
+    }
+
+    return true;
+  }, [isConnected, isWrongNetwork]);
+
+  // â”€â”€ Tx handlers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const handleApprove = async () => {
-    if (!depositAmount || amountWei === 0n) return;
+    if (!ensureWalletReady("approve NARA") || !depositAmount || amountWei === 0n) return;
     setTxStep("approving");
-    setFlash({ tone: "neutral", text: "Step 1 of 2 — Approving NARA spend. Confirm in your wallet." });
+    setFlash({ tone: "neutral", text: "Step 1 of 2 â€” Approving NARA spend. Confirm in your wallet." });
     try {
       await writeContractAsync({
         address: NARA_TOKEN_ADDRESS,
@@ -413,9 +478,9 @@ export default function App() {
   };
 
   const handleDeposit = async () => {
-    if (!depositAmount || !lockFeeWeiRead.data) return;
+    if (!ensureWalletReady("enter the draw") || !depositAmount || !lockFeeWeiRead.data) return;
     setTxStep("depositing");
-    setFlash({ tone: "neutral", text: "Step 2 of 2 — Locking NARA and entering the draw. Confirm in your wallet." });
+    setFlash({ tone: "neutral", text: "Step 2 of 2 â€” Locking NARA and entering the draw. Confirm in your wallet." });
     try {
       await writeContractAsync({
         address: NARA_LOTTO_POOL_ADDRESS,
@@ -435,7 +500,7 @@ export default function App() {
   };
 
   const handleWithdraw = async () => {
-    if (!unlockFeeWeiRead.data) return;
+    if (!ensureWalletReady("withdraw principal") || !unlockFeeWeiRead.data) return;
     setTxStep("withdrawing");
     setFlash({ tone: "neutral", text: "Withdrawing principal. Confirm in your wallet." });
     try {
@@ -455,6 +520,7 @@ export default function App() {
   };
 
   const handleDrawWinner = async () => {
+    if (!ensureWalletReady("trigger the draw")) return;
     setTxStep("drawing");
     setFlash({ tone: "neutral", text: "Triggering draw. Chainlink VRF will pick the winner." });
     try {
@@ -474,6 +540,7 @@ export default function App() {
   };
 
   const handleClaimWinnings = async () => {
+    if (!ensureWalletReady("claim winnings")) return;
     setTxStep("claiming");
     setFlash({ tone: "neutral", text: "Claiming winnings. Confirm in your wallet." });
     try {
@@ -492,6 +559,7 @@ export default function App() {
   };
 
   const handleHarvest = async () => {
+    if (!ensureWalletReady("harvest yield")) return;
     setTxStep("harvesting");
     setFlash({ tone: "neutral", text: "Harvesting yield into the pot..." });
     try {
@@ -519,7 +587,7 @@ export default function App() {
 
   const isBusy = txStep !== "idle";
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  // â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   return (
     <>
@@ -527,12 +595,12 @@ export default function App() {
     <main id="main-content">
     <div className="nb-shell">
 
-      {/* ── Hero ── */}
+      {/* â”€â”€ Hero â”€â”€ */}
       <header className="nb-hero">
         <div>
           <h1>Lucky Epoch</h1>
           <div className="nb-hero-meta">
-            <p className="nb-subtitle">no-loss yield lottery on base — principal always returned</p>
+            <p className="nb-subtitle">no-loss yield lottery on base â€” principal always returned</p>
             <div className="nb-epoch-pill">
               <span className="nb-epoch-dot" />
               <span>Epoch</span>
@@ -545,7 +613,7 @@ export default function App() {
         </div>
       </header>
 
-      {/* ── Stats row ── */}
+      {/* â”€â”€ Stats row â”€â”€ */}
       <section className="nb-stats-grid">
         {/* Pot */}
         <div className="nb-stat-card">
@@ -567,15 +635,15 @@ export default function App() {
         {/* Your odds */}
         <div className="nb-stat-card">
           <p className="nb-stat-label">Your Odds</p>
-          {isConnected && isParticipant ? (
+          {isConnected && !isWrongNetwork && isParticipant ? (
             <>
               <p className="nb-stat-value">{userOddsPercent.toFixed(2)}%</p>
               <p className="nb-stat-sub">per draw</p>
             </>
           ) : (
             <>
-              <p className="nb-stat-value">—</p>
-              <p className="nb-stat-sub">{isConnected ? "not in draw" : "connect wallet"}</p>
+              <p className="nb-stat-value">â€”</p>
+              <p className="nb-stat-sub">{!isConnected ? "connect wallet" : isWrongNetwork ? `switch to ${NARA_CHAIN_NAME}` : "not in draw"}</p>
             </>
           )}
         </div>
@@ -595,14 +663,14 @@ export default function App() {
             </>
           ) : (
             <>
-              <p className="nb-stat-value">{epochsUntilDraw > 0 ? epochsToTime(epochsUntilDraw) : "—"}</p>
+              <p className="nb-stat-value">{epochsUntilDraw > 0 ? epochsToTime(epochsUntilDraw) : "â€”"}</p>
               <p className="nb-stat-sub">{epochsUntilDraw} epochs remaining</p>
             </>
           )}
         </div>
       </section>
 
-      {/* ── Flash banner ── */}
+      {/* â”€â”€ Flash banner â”€â”€ */}
       {hasWinnings && (
         <div className="nb-flash winner">
           You won! Claim your prize: {formatNara(winningsNara)} NARA + {formatEth(winningsEth)} ETH
@@ -610,12 +678,17 @@ export default function App() {
       )}
       {!hasWinnings && drawReady && !drawPending && (
         <div className="nb-flash draw-ready">
-          Draw is ready. Anyone can trigger it — earn a small keeper reward for doing so.
+          Draw is ready. Anyone can trigger it â€” earn a small keeper reward for doing so.
         </div>
       )}
       {drawPending && (
         <div className="nb-flash neutral">
-          Draw in progress — waiting for Chainlink VRF randomness to arrive on-chain.
+          Draw in progress â€” waiting for Chainlink VRF randomness to arrive on-chain.
+        </div>
+      )}
+      {isWrongNetwork && (
+        <div className="nb-flash error">
+          Your wallet is connected to the wrong network. Switch to {NARA_CHAIN_NAME} before approving, depositing, harvesting, drawing, claiming, or withdrawing.
         </div>
       )}
       {flash && (
@@ -632,10 +705,10 @@ export default function App() {
         </div>
       )}
 
-      {/* ── Main 2-col ── */}
+      {/* â”€â”€ Main 2-col â”€â”€ */}
       <div className="nb-main-grid">
 
-        {/* ── Deposit Panel ── */}
+        {/* â”€â”€ Deposit Panel â”€â”€ */}
         <div className="nb-panel">
           <h2 className="nb-panel-header">Enter the Draw</h2>
 
@@ -645,16 +718,16 @@ export default function App() {
           </p>
 
           {!isConnected ? (
-            <ConnectButton.Custom>
-              {({ mounted, openConnectModal, authenticationStatus }) => {
-                const ready = mounted && authenticationStatus !== "loading";
-                return (
-                  <button type="button" className="nb-btn-primary" onClick={openConnectModal} disabled={!ready}>
-                    Connect to Deposit
-                  </button>
-                );
-              }}
-            </ConnectButton.Custom>
+            <WalletSetupCard
+              title="Connect a wallet to enter"
+              body="MetaMask, Rabby, Coinbase Wallet, and WalletConnect are supported. Unlock your wallet first if the popup does not appear."
+              connectLabel="Connect Wallet"
+            />
+          ) : isWrongNetwork ? (
+            <WalletSetupCard
+              title={`Switch to ${NARA_CHAIN_NAME} to continue`}
+              body={`Approvals, deposits, withdrawals, draw triggers, harvests, and prize claims only settle on ${NARA_CHAIN_NAME} mainnet.`}
+            />
           ) : isParticipant ? (
             <div className="nb-inner-card">
               <div style={{ marginBottom: "12px" }}>
@@ -725,7 +798,7 @@ export default function App() {
                 />
                 {minDepositAmount > 0n && (
                   <p className="nb-input-helper">
-                    Min: {formatNara(minDepositAmount)} NARA{maxDepositAmount > 0n ? ` · Max: ${formatNara(maxDepositAmount)} NARA` : ""}
+                    Min: {formatNara(minDepositAmount)} NARA{maxDepositAmount > 0n ? ` Â· Max: ${formatNara(maxDepositAmount)} NARA` : ""}
                   </p>
                 )}
               </div>
@@ -747,6 +820,10 @@ export default function App() {
                   </div>
                 </div>
               )}
+
+              <p className="nb-wallet-action-note">
+                Approve NARA once, then confirm the deposit transaction in your wallet on {NARA_CHAIN_NAME}.
+              </p>
 
               <button
                 type="button"
@@ -785,15 +862,21 @@ export default function App() {
           )}
         </div>
 
-        {/* ── My Position ── */}
+        {/* â”€â”€ My Position â”€â”€ */}
         <div className="nb-panel">
           <h2 className="nb-panel-header">My Position</h2>
 
           {!isConnected ? (
-            <div className="nb-placeholder">
-              <span className="nb-placeholder-icon">◎</span>
-              Connect wallet to see your position
-            </div>
+            <WalletSetupCard
+              title="Connect the wallet that joined the draw"
+              body="Your odds, unlock timing, and any claimable prizes load only after the right wallet is connected."
+              connectLabel="Connect Wallet"
+            />
+          ) : isWrongNetwork ? (
+            <WalletSetupCard
+              title={`Switch to ${NARA_CHAIN_NAME} to load your position`}
+              body={`Reconnect on ${NARA_CHAIN_NAME} to view your live odds, unlock date, and any claimable winnings.`}
+            />
           ) : (
             <>
               {hasWinnings && (
@@ -886,7 +969,7 @@ export default function App() {
                 </>
               ) : (
                 <div className="nb-placeholder">
-                  <span className="nb-placeholder-icon">◇</span>
+                  <span className="nb-placeholder-icon">â—‡</span>
                   <span className="nb-badge not-in-draw">Not in Draw</span>
                   Deposit to enter the current draw and earn yield
                 </div>
@@ -896,7 +979,7 @@ export default function App() {
         </div>
       </div>
 
-      {/* ── Draw Section ── */}
+      {/* â”€â”€ Draw Section â”€â”€ */}
       <div className="nb-draw-section">
         <h2 className="nb-panel-header">Draw</h2>
 
@@ -909,46 +992,57 @@ export default function App() {
               </div>
             ) : drawReady ? (
               <div className="nb-draw-status-text">
-                Draw is ready for epoch {lastDrawEpoch + drawFrequencyEpochs}. Anyone can trigger.
+                Draw is ready for epoch {nextDrawEpoch}. Anyone can trigger.
               </div>
             ) : (
               <div>
-                <p className="nb-countdown">{epochsUntilDraw > 0 ? epochsToTime(epochsUntilDraw) : "—"}</p>
-                <p className="nb-countdown-label">until next draw · epoch {lastDrawEpoch + drawFrequencyEpochs}</p>
+                <p className="nb-countdown">{epochsUntilDraw > 0 ? epochsToTime(epochsUntilDraw) : "â€”"}</p>
+                <p className="nb-countdown-label">until next draw · epoch {nextDrawEpoch}</p>
               </div>
             )}
           </div>
 
-          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-            {drawReady && !drawPending && (
+          {!isConnected || isWrongNetwork ? (
+            <div className="nb-draw-wallet-note">
+              <p className="nb-wallet-help-text">
+                {!isConnected
+                  ? "Connect a wallet to harvest yield or trigger the next draw."
+                  : `Switch to ${NARA_CHAIN_NAME} to harvest yield or trigger the next draw.`}
+              </p>
+              <WalletActionButton className="nb-btn-secondary" connectLabel="Connect Wallet" />
+            </div>
+          ) : (
+            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+              {drawReady && !drawPending && (
+                <button
+                  type="button"
+                  className="nb-btn-gold"
+                  style={{ width: "auto", minWidth: "180px", marginBottom: 0 }}
+                  onClick={handleDrawWinner}
+                  disabled={isBusy}
+                  aria-busy={txStep === "drawing"}
+                >
+                  {txStep === "drawing" ? (
+                    <>
+                      <span className="nb-spinner" aria-hidden="true" />
+                      <span className="nb-sr-only">Triggering...</span>
+                      Triggering...
+                    </>
+                  ) : "Trigger Draw Winner"}
+                </button>
+              )}
               <button
                 type="button"
-                className="nb-btn-gold"
-                style={{ width: "auto", minWidth: "180px", marginBottom: 0 }}
-                onClick={handleDrawWinner}
+                className="nb-btn-secondary"
+                style={{ width: "auto", minWidth: "140px", marginBottom: 0 }}
+                onClick={handleHarvest}
                 disabled={isBusy}
-                aria-busy={txStep === "drawing"}
+                title="Harvest accumulated yield from all participant positions into the pot"
               >
-                {txStep === "drawing" ? (
-                  <>
-                    <span className="nb-spinner" aria-hidden="true" />
-                    <span className="nb-sr-only">Triggering...</span>
-                    Triggering...
-                  </>
-                ) : "Trigger Draw Winner"}
+                {txStep === "harvesting" ? "Harvesting..." : "Harvest Yield"}
               </button>
-            )}
-            <button
-              type="button"
-              className="nb-btn-secondary"
-              style={{ width: "auto", minWidth: "140px", marginBottom: 0 }}
-              onClick={handleHarvest}
-              disabled={isBusy}
-              title="Harvest accumulated yield from all participant positions into the pot"
-            >
-              {txStep === "harvesting" ? "Harvesting..." : "Harvest Yield"}
-            </button>
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Draw history */}
@@ -979,7 +1073,7 @@ export default function App() {
                         onClick={() => handleCopy(rec.winner)}
                         aria-label={copiedAddr === rec.winner ? "Copied!" : "Copy address"}
                       >
-                        {copiedAddr === rec.winner ? "✓" : "Copy"}
+                        {copiedAddr === rec.winner ? "âœ“" : "Copy"}
                       </button>
                     </td>
                     <td>{formatNara(rec.potNara)} NARA</td>
@@ -992,9 +1086,9 @@ export default function App() {
                           rel="noopener noreferrer"
                           className="nb-view-link"
                         >
-                          View →
+                          View â†’
                         </a>
-                      ) : "—"}
+                      ) : "â€”"}
                     </td>
                   </tr>
                 ))}
@@ -1004,7 +1098,7 @@ export default function App() {
         )}
       </div>
 
-      {/* ── Trust bar ── */}
+      {/* â”€â”€ Trust bar â”€â”€ */}
       <div className="nb-trust-bar">
         <a
           href={`https://basescan.org/address/${NARA_LOTTO_POOL_ADDRESS}`}
@@ -1025,7 +1119,7 @@ export default function App() {
         <span className="nb-trust-pill">Chainlink VRF</span>
         <span className="nb-trust-pill">Principal Protected</span>
         <a
-          href="https://github.com/ruvnet/claude-flow"
+          href="https://github.com/leonardDEV21/lotto-game"
           target="_blank"
           rel="noopener noreferrer"
           className="nb-trust-pill"
@@ -1039,3 +1133,4 @@ export default function App() {
     </>
   );
 }
+

@@ -1,4 +1,4 @@
-User-agent: *
+﻿User-agent: *
 Allow: /
 
-Sitemap: https://nara-lockboard.pages.dev/sitemap.xml
+Sitemap: https://www.naraprotocol.io/lotto/sitemap.xml

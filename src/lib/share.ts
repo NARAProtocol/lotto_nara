@@ -1,9 +1,9 @@
-import { formatUnits } from "viem";
+﻿import { formatUnits } from "viem";
 
 import { getTierByKey } from "../shared/board";
 import type { BoardStats, SlotClaimRecord } from "../shared/types";
 
-const SITE_URL = "https://www.naraprotocol.io/mine";
+const SITE_URL = "https://www.naraprotocol.io/lotto";
 const DEFAULT_ALIAS_PATTERN = /^0x[a-f0-9]{4}\.\.\.[a-f0-9]{4}$/i;
 
 function formatTokenAmount(rawWei: string) {
@@ -50,16 +50,16 @@ function resolveShareIdentity(claim: SlotClaimRecord) {
 function tierEmoji(tierKey: SlotClaimRecord["tierKey"]) {
   switch (tierKey) {
     case "t1000":
-      return "👑";
+      return "ðŸ‘‘";
     case "t500":
-      return "🔥";
+      return "ðŸ”¥";
     case "t250":
-      return "⚡";
+      return "âš¡";
     case "t100":
-      return "🔒";
+      return "ðŸ”’";
     case "t50":
     default:
-      return "🧱";
+      return "ðŸ§±";
   }
 }
 

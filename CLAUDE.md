@@ -1,7 +1,7 @@
-# NARA Lockboard AI Context
+﻿# NARA Lucky Epoch AI Context
 
 Last updated: 2026-03-22.
-This folder is the active Cloudflare Pages app for `/mine`.
+This folder is the active Cloudflare Pages app for `/lotto`.
 
 ## Deploy Rule
 
@@ -11,7 +11,7 @@ Important:
 
 - the token may already exist in `C:\Users\linas\Desktop\FIELD Token\nara-protocol-hardhat\.env`
 - Wrangler will not read that `.env` file automatically
-- if deploy or D1 commands fail with a missing-token error, load the token into the shell first
+- if deploy commands fail with a missing-token error, load the token into the shell first
 
 PowerShell helper:
 
@@ -22,11 +22,10 @@ $env:CLOUDFLARE_API_TOKEN = $tokenLine.Substring('CLOUDFLARE_API_TOKEN='.Length)
 
 ## Current Project Names
 
-- Pages project: `nara-lockboard`
-- D1 database: `nara-lockboard`
-- public route: `https://www.naraprotocol.io/mine`
+- Pages project: `nara-lotto`
+- public route: `https://www.naraprotocol.io/lotto`
 
 ## Current Branding Rule
 
-Use `NARA Degen Board` in the visible app UI.
-Do not rename the underlying Cloudflare project or D1 binding unless explicitly requested.
+Use `NARA Lucky Epoch` in the visible app UI.
+Keep the frontend static and production-safe unless a server-side feature is explicitly requested.

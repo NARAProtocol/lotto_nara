@@ -1,6 +1,6 @@
-# NARA Lockboard
+﻿# NARA Lucky Epoch
 
-Cloudflare Pages + Functions + D1 app for the live NARA OG lockboard.
+Cloudflare Pages app for the live NARA no-loss lottery on Base.
 
 ## Local
 
@@ -11,13 +11,12 @@ npm run build
 npm run dev
 ```
 
-## Required Cloudflare setup
+## Production
 
-- Pages project: `nara-lockboard`
-- D1 database: `nara-lockboard`
-- `wrangler.toml` contains the bound D1 `database_id`
+- Pages project: `nara-lotto`
+- Production route: `https://www.naraprotocol.io/lotto`
+- Preview route: `https://nara-lotto.pages.dev`
 - `CLOUDFLARE_API_TOKEN` must be available in the current shell for remote Wrangler actions
-- optional Cloudflare Pages/Functions var: `EXCLUDED_WALLETS=0xWallet1,0xWallet2` for any extra wallets beyond the built-in treasury/owner/operator exclusions
 
 Important deploy note:
 
@@ -34,31 +33,24 @@ If `wrangler` says `TOKEN_MISSING`, this is the first thing to check.
 
 ## Optional client env
 
-Create `.env` from `.env.example` if you want a real RainbowKit/WalletConnect project ID during local or CI builds.
+Create `.env` from `.env.example` for a real RainbowKit project ID during local or CI builds.
 
 ```bash
 VITE_RAINBOW_PROJECT_ID=your_project_id
-VITE_EXCLUDED_WALLETS=0xYourExtraExcludedWallet
-```
-
-Legacy fallback is also supported:
-
-```bash
 VITE_WALLETCONNECT_PROJECT_ID=your_project_id
+VITE_BASE_RPC_URL=https://base-mainnet.g.alchemy.com/v2/YOUR_KEY
 ```
 
-If neither variable is set, the app still builds, but WalletConnect-specific flows may be limited.
+If neither project ID variable is set, the app still builds, but WalletConnect-specific flows may be limited.
 
 ## Cloudflare commands
 
 ```bash
 npm run cf:project:create
-npm run cf:db:apply
-npm run cf:db:verify
 npm run deploy:cf:prod
 ```
 
 ## Live URLs
 
-- Production: https://www.naraprotocol.io/mine
-- Board API: https://www.naraprotocol.io/mine/api/board
+- Production: https://www.naraprotocol.io/lotto
+- Preview: https://nara-lotto.pages.dev

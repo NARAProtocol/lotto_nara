@@ -8,31 +8,31 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test src/lib/*.test.ts",
-    "cf:project:create": "wrangler pages project create nara-lockboard --production-branch main",
-    "cf:db:apply": "wrangler d1 migrations apply nara-lockboard --remote",
-    "cf:db:verify": "wrangler d1 execute nara-lockboard --remote --command \"SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;\"",
-    "deploy:cf": "npm run build && wrangler pages deploy dist --project-name nara-lockboard",
-    "deploy:cf:prod": "npm run build && wrangler pages deploy dist --project-name nara-lockboard --branch main"
+    "test": "node --import tsx --test src/lib/logic.test.ts src/lib/share.test.ts",
+    "cf:project:create": "wrangler pages project create nara-lotto --production-branch main",
+    "deploy:cf": "npm run build && wrangler pages deploy dist --project-name nara-lotto",
+    "deploy:cf:prod": "npm run build && wrangler pages deploy dist --project-name nara-lotto --branch main"
   },
   "dependencies": {
-    "@rainbow-me/rainbowkit": "latest",
-    "@tanstack/react-query": "latest",
+    "@rainbow-me/rainbowkit": "2.2.10",
+    "@tanstack/react-query": "5.94.5",
     "buffer": "^6.0.3",
-    "react": "latest",
-    "react-dom": "latest",
-    "viem": "latest",
-    "wagmi": "latest"
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "viem": "2.47.6",
+    "wagmi": "2.19.5"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "latest",
+    "@cloudflare/workers-types": "4.20260405.1",
     "@types/node": "^25.5.2",
-    "@types/react": "latest",
-    "@types/react-dom": "latest",
-    "@vitejs/plugin-react": "latest",
-    "tsx": "latest",
-    "typescript": "latest",
-    "vite": "latest",
-    "wrangler": "latest"
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "4.3.4",
+    "tsx": "4.20.6",
+    "typescript": "5.9.3",
+    "vite": "5.4.21",
+    "wrangler": "4.39.0"
   }
 }
+
+

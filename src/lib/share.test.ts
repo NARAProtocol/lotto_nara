@@ -1,4 +1,4 @@
-import test from "node:test";
+﻿import test from "node:test";
 import assert from "node:assert/strict";
 
 import { buildWarpcastShareUrl, buildXShareText } from "./share";
@@ -53,5 +53,5 @@ test("builds X share copy with weight and tier scarcity", () => {
 test("builds Warpcast share URL with embed card", () => {
   const url = buildWarpcastShareUrl("hello world");
   assert.match(url, /text=hello\+world/);
-  assert.match(url, /embeds%5B%5D=https%3A%2F%2Fwww\.naraprotocol\.io%2Fmine/);
+  assert.match(url, /embeds%5B%5D=https%3A%2F%2Fwww\.naraprotocol\.io%2Flotto/);
 });

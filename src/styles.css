@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&display=swap');
+﻿@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&display=swap');
 
 :root {
   color-scheme: light;
@@ -100,14 +100,14 @@ button:focus-visible {
   outline-offset: 3px;
 }
 
-/* ── Shell ── */
+/* â”€â”€ Shell â”€â”€ */
 .nb-shell {
   width: min(1120px, 100%);
   margin: 0 auto;
   padding: 28px 12px 56px;
 }
 
-/* ── Hero ── */
+/* â”€â”€ Hero â”€â”€ */
 .nb-hero {
   display: flex;
   align-items: flex-start;
@@ -147,7 +147,7 @@ button:focus-visible {
   align-self: flex-start;
 }
 
-/* ── Epoch pill ── */
+/* â”€â”€ Epoch pill â”€â”€ */
 .nb-epoch-pill {
   display: inline-flex;
   align-items: center;
@@ -183,7 +183,7 @@ button:focus-visible {
   50% { opacity: 0.45; transform: scale(0.82); }
 }
 
-/* ── Wallet buttons ── */
+/* â”€â”€ Wallet buttons â”€â”€ */
 .nb-wallet-trigger,
 .nb-wallet-hero-btn {
   display: inline-flex;
@@ -280,7 +280,7 @@ button:focus-visible {
   flex-shrink: 0;
 }
 
-/* ── Stat cards ── */
+/* â”€â”€ Stat cards â”€â”€ */
 .nb-stats-grid {
   display: flex;
   justify-content: center;
@@ -352,7 +352,7 @@ button:focus-visible {
   transition: width 0.4s ease;
 }
 
-/* ── Flash / alerts ── */
+/* â”€â”€ Flash / alerts â”€â”€ */
 .nb-flash {
   width: 100%;
   border-radius: 12px;
@@ -397,7 +397,7 @@ button:focus-visible {
   background: var(--t500-bg);
 }
 
-/* ── Main 2-col layout ── */
+/* â”€â”€ Main 2-col layout â”€â”€ */
 .nb-main-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -405,7 +405,7 @@ button:focus-visible {
   margin-bottom: 16px;
 }
 
-/* ── Panels ── */
+/* â”€â”€ Panels â”€â”€ */
 .nb-panel {
   border-radius: 22px;
   border: 1px solid var(--line-strong);
@@ -435,7 +435,42 @@ button:focus-visible {
   margin-bottom: 0;
 }
 
-/* ── Data row pattern ── */
+.nb-wallet-help {
+  border-radius: 16px;
+  border: 1px solid rgba(24, 119, 242, 0.18);
+  background: rgba(24, 119, 242, 0.05);
+  padding: 16px;
+}
+
+.nb-wallet-help-title {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.nb-wallet-help-text {
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.nb-wallet-help .nb-btn-primary,
+.nb-wallet-help .nb-btn-secondary,
+.nb-draw-wallet-note .nb-btn-primary,
+.nb-draw-wallet-note .nb-btn-secondary {
+  margin-bottom: 0;
+}
+
+.nb-wallet-action-note {
+  margin: 0 0 10px;
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+/* â”€â”€ Data row pattern â”€â”€ */
 .nb-data-row {
   display: flex;
   justify-content: space-between;
@@ -468,7 +503,7 @@ button:focus-visible {
   font-variant-numeric: tabular-nums;
 }
 
-/* ── Form elements ── */
+/* â”€â”€ Form elements â”€â”€ */
 .nb-input-wrap {
   margin-bottom: 14px;
 }
@@ -522,7 +557,7 @@ button:focus-visible {
   margin-top: 5px;
 }
 
-/* ── Buttons ── */
+/* â”€â”€ Buttons â”€â”€ */
 .nb-btn-primary {
   width: 100%;
   min-height: 52px;
@@ -614,7 +649,7 @@ button:focus-visible {
   cursor: not-allowed;
 }
 
-/* ── Badge chips ── */
+/* â”€â”€ Badge chips â”€â”€ */
 .nb-badge {
   display: inline-flex;
   align-items: center;
@@ -645,7 +680,7 @@ button:focus-visible {
   border: 1px solid var(--t500-brd);
 }
 
-/* ── Step indicator ── */
+/* â”€â”€ Step indicator â”€â”€ */
 .nb-step-indicator {
   display: flex;
   align-items: center;
@@ -668,7 +703,7 @@ button:focus-visible {
   animation: nb-epoch-pulse 1.4s ease-in-out infinite;
 }
 
-/* ── Progress bar ── */
+/* â”€â”€ Progress bar â”€â”€ */
 .nb-prog-track {
   height: 5px;
   border-radius: 999px;
@@ -685,7 +720,7 @@ button:focus-visible {
   transition: width 0.4s ease;
 }
 
-/* ── Draw section ── */
+/* â”€â”€ Draw section â”€â”€ */
 .nb-draw-section {
   border-radius: 22px;
   border: 1px solid var(--line-strong);
@@ -693,6 +728,10 @@ button:focus-visible {
   box-shadow: var(--panel-shadow);
   padding: 22px 18px 18px;
   margin-bottom: 16px;
+}
+
+.nb-draw-wallet-note {
+  width: min(320px, 100%);
 }
 
 /* Draw history table */
@@ -767,7 +806,7 @@ button:focus-visible {
   text-decoration: underline;
 }
 
-/* ── Spinner ── */
+/* â”€â”€ Spinner â”€â”€ */
 .nb-spinner {
   display: inline-block;
   width: 16px;
@@ -783,7 +822,7 @@ button:focus-visible {
   to { transform: rotate(360deg); }
 }
 
-/* ── Trust bar ── */
+/* â”€â”€ Trust bar â”€â”€ */
 .nb-trust-bar {
   display: flex;
   flex-wrap: wrap;
@@ -815,7 +854,7 @@ button:focus-visible {
   color: var(--accent);
 }
 
-/* ── Winner callout ── */
+/* â”€â”€ Winner callout â”€â”€ */
 .nb-winner-callout {
   border-radius: 16px;
   border: 1px solid var(--t500-brd);
@@ -840,7 +879,7 @@ button:focus-visible {
   margin: 0 0 12px;
 }
 
-/* ── Placeholder states ── */
+/* â”€â”€ Placeholder states â”€â”€ */
 .nb-placeholder {
   display: flex;
   flex-direction: column;
@@ -859,7 +898,7 @@ button:focus-visible {
   opacity: 0.5;
 }
 
-/* ── Skeleton shimmer ── */
+/* â”€â”€ Skeleton shimmer â”€â”€ */
 .nb-skeleton {
   border-radius: 8px;
   background: linear-gradient(90deg, rgba(34, 28, 19, 0.06) 25%, rgba(34, 28, 19, 0.12) 50%, rgba(34, 28, 19, 0.06) 75%);
@@ -867,7 +906,7 @@ button:focus-visible {
   animation: shimmer 1.4s ease-in-out infinite;
 }
 
-/* ── Draw row ── */
+/* â”€â”€ Draw row â”€â”€ */
 .nb-draw-trigger-row {
   display: flex;
   align-items: center;
@@ -901,7 +940,7 @@ button:focus-visible {
   text-transform: uppercase;
 }
 
-/* ── Info text ── */
+/* â”€â”€ Info text â”€â”€ */
 .nb-info-text {
   font-size: 12px;
   color: var(--muted);
@@ -910,7 +949,7 @@ button:focus-visible {
   margin: 0 0 16px;
 }
 
-/* ── Preview card ── */
+/* â”€â”€ Preview card â”€â”€ */
 .nb-preview-card {
   border-radius: 14px;
   border: 1px solid rgba(24, 119, 242, 0.18);
@@ -924,7 +963,7 @@ button:focus-visible {
   color: #2d66af;
 }
 
-/* ── Animations ── */
+/* â”€â”€ Animations â”€â”€ */
 @keyframes pulse-lock {
   0%, 100% { opacity: 0.35; transform: scale(0.94); }
   50% { opacity: 1; transform: scale(1.02); }
@@ -940,7 +979,7 @@ button:focus-visible {
   50% { transform: scale(1.012); }
 }
 
-/* ── Responsive ── */
+/* â”€â”€ Responsive â”€â”€ */
 @media (max-width: 720px) {
   .nb-main-grid {
     grid-template-columns: 1fr;
@@ -981,7 +1020,7 @@ button:focus-visible {
   }
 }
 
-/* ── Empty state ── */
+/* â”€â”€ Empty state â”€â”€ */
 .nb-empty-state {
   text-align: center;
   padding: 28px 16px;
@@ -990,7 +1029,7 @@ button:focus-visible {
   letter-spacing: 0.08em;
 }
 
-/* ── Screen-reader only ── */
+/* â”€â”€ Screen-reader only â”€â”€ */
 .nb-sr-only {
   position: absolute;
   width: 1px;
@@ -1003,7 +1042,7 @@ button:focus-visible {
   border: 0;
 }
 
-/* ── Skip-to-content link ── */
+/* â”€â”€ Skip-to-content link â”€â”€ */
 .nb-skip-link {
   position: absolute;
   top: -100%;
@@ -1022,7 +1061,7 @@ button:focus-visible {
   top: 0;
 }
 
-/* ── Reduced motion ── */
+/* â”€â”€ Reduced motion â”€â”€ */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -1033,3 +1072,4 @@ button:focus-visible {
     scroll-behavior: auto !important;
   }
 }
+
