@@ -427,7 +427,7 @@ export default function App() {
         });
       setDrawHistory(records);
     } catch {
-      // silently fail â€” no history to show
+      // silently fail - no history to show
     }
   }, [publicClient]);
 
@@ -460,7 +460,7 @@ export default function App() {
   const handleApprove = async () => {
     if (!ensureWalletReady("approve NARA") || !depositAmount || amountWei === 0n) return;
     setTxStep("approving");
-    setFlash({ tone: "neutral", text: "Step 1 of 2 â€” Approving NARA spend. Confirm in your wallet." });
+    setFlash({ tone: "neutral", text: "Step 1 of 2 - Approving NARA spend. Confirm in your wallet." });
     try {
       await writeContractAsync({
         address: NARA_TOKEN_ADDRESS,
@@ -480,7 +480,7 @@ export default function App() {
   const handleDeposit = async () => {
     if (!ensureWalletReady("enter the draw") || !depositAmount || !lockFeeWeiRead.data) return;
     setTxStep("depositing");
-    setFlash({ tone: "neutral", text: "Step 2 of 2 â€” Locking NARA and entering the draw. Confirm in your wallet." });
+    setFlash({ tone: "neutral", text: "Step 2 of 2 - Locking NARA and entering the draw. Confirm in your wallet." });
     try {
       await writeContractAsync({
         address: NARA_LOTTO_POOL_ADDRESS,
@@ -600,7 +600,7 @@ export default function App() {
         <div>
           <h1>Lucky Epoch</h1>
           <div className="nb-hero-meta">
-            <p className="nb-subtitle">no-loss yield lottery on base â€” principal always returned</p>
+            <p className="nb-subtitle">no-loss yield lottery on base - principal always returned</p>
             <div className="nb-epoch-pill">
               <span className="nb-epoch-dot" />
               <span>Epoch</span>
@@ -642,7 +642,7 @@ export default function App() {
             </>
           ) : (
             <>
-              <p className="nb-stat-value">â€”</p>
+              <p className="nb-stat-value">-</p>
               <p className="nb-stat-sub">{!isConnected ? "connect wallet" : isWrongNetwork ? `switch to ${NARA_CHAIN_NAME}` : "not in draw"}</p>
             </>
           )}
@@ -663,7 +663,7 @@ export default function App() {
             </>
           ) : (
             <>
-              <p className="nb-stat-value">{epochsUntilDraw > 0 ? epochsToTime(epochsUntilDraw) : "â€”"}</p>
+              <p className="nb-stat-value">{epochsUntilDraw > 0 ? epochsToTime(epochsUntilDraw) : "-"}</p>
               <p className="nb-stat-sub">{epochsUntilDraw} epochs remaining</p>
             </>
           )}
@@ -678,12 +678,12 @@ export default function App() {
       )}
       {!hasWinnings && drawReady && !drawPending && (
         <div className="nb-flash draw-ready">
-          Draw is ready. Anyone can trigger it â€” earn a small keeper reward for doing so.
+          Draw is ready. Anyone can trigger it - earn a small keeper reward for doing so.
         </div>
       )}
       {drawPending && (
         <div className="nb-flash neutral">
-          Draw in progress â€” waiting for Chainlink VRF randomness to arrive on-chain.
+          Draw in progress - waiting for Chainlink VRF randomness to arrive on-chain.
         </div>
       )}
       {isWrongNetwork && (
@@ -798,7 +798,7 @@ export default function App() {
                 />
                 {minDepositAmount > 0n && (
                   <p className="nb-input-helper">
-                    Min: {formatNara(minDepositAmount)} NARA{maxDepositAmount > 0n ? ` Â· Max: ${formatNara(maxDepositAmount)} NARA` : ""}
+                    Min: {formatNara(minDepositAmount)} NARA{maxDepositAmount > 0n ? ` - Max: ${formatNara(maxDepositAmount)} NARA` : ""}
                   </p>
                 )}
               </div>
@@ -969,7 +969,7 @@ export default function App() {
                 </>
               ) : (
                 <div className="nb-placeholder">
-                  <span className="nb-placeholder-icon">â—‡</span>
+                  <span className="nb-placeholder-icon">*</span>
                   <span className="nb-badge not-in-draw">Not in Draw</span>
                   Deposit to enter the current draw and earn yield
                 </div>
@@ -996,7 +996,7 @@ export default function App() {
               </div>
             ) : (
               <div>
-                <p className="nb-countdown">{epochsUntilDraw > 0 ? epochsToTime(epochsUntilDraw) : "â€”"}</p>
+                <p className="nb-countdown">{epochsUntilDraw > 0 ? epochsToTime(epochsUntilDraw) : "-"}</p>
                 <p className="nb-countdown-label">until next draw · epoch {nextDrawEpoch}</p>
               </div>
             )}
@@ -1073,7 +1073,7 @@ export default function App() {
                         onClick={() => handleCopy(rec.winner)}
                         aria-label={copiedAddr === rec.winner ? "Copied!" : "Copy address"}
                       >
-                        {copiedAddr === rec.winner ? "âœ“" : "Copy"}
+                        {copiedAddr === rec.winner ? "Copied" : "Copy"}
                       </button>
                     </td>
                     <td>{formatNara(rec.potNara)} NARA</td>
@@ -1086,9 +1086,9 @@ export default function App() {
                           rel="noopener noreferrer"
                           className="nb-view-link"
                         >
-                          View â†’
+                          View -&gt;
                         </a>
-                      ) : "â€”"}
+                      ) : "-"}
                     </td>
                   </tr>
                 ))}

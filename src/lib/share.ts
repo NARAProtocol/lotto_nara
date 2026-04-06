@@ -50,16 +50,16 @@ function resolveShareIdentity(claim: SlotClaimRecord) {
 function tierEmoji(tierKey: SlotClaimRecord["tierKey"]) {
   switch (tierKey) {
     case "t1000":
-      return "ðŸ‘‘";
+      return "Founder";
     case "t500":
-      return "ðŸ”¥";
+      return "Premium";
     case "t250":
-      return "âš¡";
+      return "Boost";
     case "t100":
-      return "ðŸ”’";
+      return "Lock";
     case "t50":
     default:
-      return "ðŸ§±";
+      return "Stack";
   }
 }
 
