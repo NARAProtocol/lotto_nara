@@ -158,6 +158,59 @@ button:focus-visible {
   text-align: center;
 }
 
+.nb-jackpot-hero.nb-jackpot-empty {
+  padding: 36px 42px 32px;
+  background:
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.8), transparent 24%),
+    radial-gradient(circle at 82% 18%, rgba(255, 241, 188, 0.72), transparent 28%),
+    linear-gradient(135deg, #fffaf0 0%, #fff0c8 54%, #f8d98f 100%);
+}
+
+.nb-jackpot-empty .nb-jackpot-shimmer {
+  opacity: 0.38;
+  animation-duration: 5s;
+}
+
+.nb-jackpot-empty .nb-jackpot-label {
+  margin-bottom: 8px;
+}
+
+.nb-jackpot-open {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 0 18px;
+  padding: 6px 13px;
+  border-radius: 999px;
+  border: 0.5px solid rgba(201, 130, 25, 0.28);
+  background: rgba(255, 255, 255, 0.62);
+  color: #8a5e1a;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.nb-jackpot-empty .nb-jackpot-amount {
+  gap: 14px;
+  margin-bottom: 12px;
+}
+
+.nb-jackpot-empty .nb-jackpot-nara {
+  font-size: clamp(44px, 6.4vw, 68px);
+  letter-spacing: -0.035em;
+  color: #b87518;
+}
+
+.nb-jackpot-empty .nb-jackpot-eth {
+  font-size: clamp(22px, 3.4vw, 34px);
+  opacity: 0.84;
+}
+
+.nb-jackpot-empty .nb-jackpot-sub {
+  max-width: 44rem;
+}
+
 .nb-jackpot-shimmer {
   position: absolute;
   inset: 0;

@@ -354,6 +354,7 @@ export default function App() {
 
   const potNara = (potNaraRead.data ?? 0n) as bigint;
   const potEth = (potEthRead.data ?? 0n) as bigint;
+  const prizePoolIsEmpty = potNara === 0n && potEth === 0n;
   const participantCount = Number((participantCountRead.data ?? 0n) as bigint);
   const lastDrawEpoch = Number((lastDrawEpochRead.data ?? 0n) as bigint);
   const pendingDrawRequestId = (pendingDrawRequestIdRead.data ?? 0n) as bigint;
@@ -785,15 +786,20 @@ export default function App() {
       </header>
 
       {/* Jackpot Hero */}
-      <section className="nb-jackpot-hero" aria-label="Prize Pool">
+      <section className={`nb-jackpot-hero${prizePoolIsEmpty ? " nb-jackpot-empty" : ""}`} aria-label="Prize Pool">
         <div className="nb-jackpot-shimmer" aria-hidden="true" />
         <p className="nb-jackpot-label">Live Prize Pool</p>
+        {prizePoolIsEmpty && <p className="nb-jackpot-open">Pool open - prize starts at zero</p>}
         <div className="nb-jackpot-amount">
           <span className="nb-jackpot-nara">{formatNara(potNara)}<span className="nb-jackpot-unit"> NARA</span></span>
           <span className="nb-jackpot-divider">+</span>
           <span className="nb-jackpot-eth">{formatEth(potEth)}<span className="nb-jackpot-unit"> ETH</span></span>
         </div>
-        <p className="nb-jackpot-sub">Lock NARA, keep your principal, and one live entry wins the pooled yield.</p>
+        <p className="nb-jackpot-sub">
+          {prizePoolIsEmpty
+            ? "The first locked entries start building the yield prize. Your principal remains withdrawable after the lock period."
+            : "Lock NARA, keep your principal, and one live entry wins the pooled yield."}
+        </p>
         <div className="nb-jackpot-tags">
           <span className="nb-jackpot-tag">live on base</span>
           <span className="nb-jackpot-tag">principal protected</span>
