@@ -16,7 +16,7 @@ const projectId =
   import.meta.env.VITE_WALLETCONNECT_PROJECT_ID ||
   "eaa83acd221c02c828da866941dbacf4";
 
-const rpcUrl = import.meta.env.VITE_BASE_RPC_URL || "https://base-mainnet.g.alchemy.com/v2/2SfPih6j2ng_UXyrD4Ceq";
+const rpcUrl = import.meta.env.VITE_BASE_RPC_URL || "https://mainnet.base.org";
 
 const config = getDefaultConfig({
   appName: "NARA Lucky Epoch",
