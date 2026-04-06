@@ -380,9 +380,9 @@ export default function App() {
     }
   }, [publicClient]);
 
-  useEffect(() => {
-    fetchDrawHistory();
-  }, [fetchDrawHistory]);
+  // useEffect(() => {
+  //   fetchDrawHistory();
+  // }, [fetchDrawHistory]);
 
   // ── Invalidate queries helper ─────────────────────────────────────────────
 
