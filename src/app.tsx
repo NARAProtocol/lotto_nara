@@ -359,7 +359,7 @@ export default function App() {
           ],
         },
         fromBlock,
-        toBlock: "latest",
+        toBlock: currentBlock,
       });
       const records: DrawRecord[] = logs
         .slice(-10)
