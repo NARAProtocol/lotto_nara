@@ -1,6 +1,6 @@
-﻿# NARA Lucky Epoch
+# NARA Lucky Epoch
 
-Cloudflare Pages app for the live NARA no-loss lottery on Base.
+Lucky Epoch is the live NARA prize-pool app served at `https://www.naraprotocol.io/lotto`.
 
 ## Local
 
@@ -11,29 +11,18 @@ npm run build
 npm run dev
 ```
 
-## Production
+## Live Deploy
 
-- Pages project: `nara-lotto`
-- Production route: `https://www.naraprotocol.io/lotto`
-- Preview route: `https://nara-lotto.pages.dev`
-- `CLOUDFLARE_API_TOKEN` must be available in the current shell for remote Wrangler actions
+Primary production setup:
 
-Important deploy note:
-
-- the token may already exist in `C:\Users\linas\Desktop\FIELD Token\nara-protocol-hardhat\.env`, but Wrangler does not read that file automatically
-- before `npm run deploy:cf:prod`, load the token into the shell session first
-- PowerShell example:
-
-```powershell
-$tokenLine = Get-Content 'C:\Users\linas\Desktop\FIELD Token\nara-protocol-hardhat\.env' | Where-Object { $_ -match '^CLOUDFLARE_API_TOKEN=' } | Select-Object -First 1
-$env:CLOUDFLARE_API_TOKEN = $tokenLine.Substring('CLOUDFLARE_API_TOKEN='.Length)
-```
-
-If `wrangler` says `TOKEN_MISSING`, this is the first thing to check.
+- App repo: `https://github.com/NARAProtocol/lotto_nara.git`
+- Vercel project: `lotto-nara`
+- Vercel app URL: `https://lotto-nara.vercel.app/lotto`
+- Main site route: `https://www.naraprotocol.io/lotto`
 
 ## Optional client env
 
-Create `.env` from `.env.example` for a real RainbowKit project ID during local or CI builds.
+Create `.env` from `.env.example` for a real RainbowKit project ID during local builds.
 
 ```bash
 VITE_RAINBOW_PROJECT_ID=your_project_id
@@ -43,14 +32,40 @@ VITE_BASE_RPC_URL=https://base-mainnet.g.alchemy.com/v2/YOUR_KEY
 
 If neither project ID variable is set, the app still builds, but WalletConnect-specific flows may be limited.
 
-## Cloudflare commands
+## Permanent Vercel Deploy Path
+
+Do not rely on Vercel's default Git auto-deploy for this repo while it is private and the Vercel workspace stays on Hobby.
+That setup can block production deploys based on commit author.
+
+The permanent deploy path is GitHub Actions using the Vercel project owner's token.
+
+Workflow file:
+
+- `.github/workflows/deploy-vercel-production.yml`
+
+Required GitHub repository secrets in `NARAProtocol/lotto_nara`:
+
+- `VERCEL_TOKEN`
+- `VERCEL_ORG_ID`
+- `VERCEL_PROJECT_ID`
+
+One-time setup:
+
+1. In the Vercel dashboard, open the `lotto-nara` project.
+2. Copy the `Project ID` and `Team ID` or `Org ID` from project settings.
+3. In GitHub `NARAProtocol/lotto_nara`, add the three secrets above.
+4. Keep the Vercel project env vars set in Vercel as usual.
+5. Push to `main` or run the `Deploy Lotto To Vercel` workflow manually.
+
+Recommended Vercel setting:
+
+- Disable automatic Git deployments for this project, or ignore blocked Git deployment entries and treat the GitHub Action deployment as the production source of truth.
+
+## Legacy Cloudflare Notes
+
+Cloudflare Pages commands remain in `package.json`, but Vercel is the active production path for lotto now.
 
 ```bash
 npm run cf:project:create
 npm run deploy:cf:prod
 ```
-
-## Live URLs
-
-- Production: https://www.naraprotocol.io/lotto
-- Preview: https://nara-lotto.pages.dev
