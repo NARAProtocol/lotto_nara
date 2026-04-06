@@ -286,6 +286,11 @@ button:focus-visible {
   background: var(--t100-bg);
 }
 
+.nb-ctx-card.nb-ctx-warm {
+  border-color: rgba(24, 119, 242, 0.18);
+  background: rgba(24, 119, 242, 0.05);
+}
+
 .nb-ctx-label {
   font-size: 9px;
   letter-spacing: 0.18em;
@@ -327,6 +332,10 @@ button:focus-visible {
 
 .nb-ctx-value.nb-ctx-live {
   color: #1a7a3c;
+}
+
+.nb-ctx-value.nb-ctx-wait {
+  color: #2d66af;
 }
 
 .nb-ctx-sub {

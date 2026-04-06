@@ -222,6 +222,7 @@ export default function App() {
   const [flash, setFlash] = useState<Flash | null>(null);
   const [txStep, setTxStep] = useState<"idle" | "approving" | "syncing" | "depositing" | "withdrawing" | "drawing" | "claiming" | "harvesting">("idle");
   const [drawHistory, setDrawHistory] = useState<DrawRecord[]>([]);
+  const [liveParticipantCount, setLiveParticipantCount] = useState<number | null>(null);
   const [copiedAddr, setCopiedAddr] = useState<string | null>(null);
 
   const isWrongNetwork = Boolean(isConnected && chainId != null && chainId !== NARA_CHAIN_ID);
@@ -361,6 +362,8 @@ export default function App() {
   const minDepositAmount = poolConfig ? (poolConfig.minDepositAmount as bigint) : 0n;
   const maxDepositAmount = poolConfig ? (poolConfig.maxDepositAmount as bigint) : 0n;
   const openSpots = Math.max(0, maxParticipants - participantCount);
+  const liveEntriesKnown = liveParticipantCount !== null;
+  const liveEntries = liveParticipantCount ?? 0;
 
   const pData = participantDataRead.data as any;
   const isParticipant = Boolean(pData?.isActive ?? (pData && pData[4] === true));
@@ -384,12 +387,14 @@ export default function App() {
   const allowance = (tokenAllowanceRead.data ?? 0n) as bigint;
   const isApproved = amountWei > 0n && allowance >= amountWei;
 
-  const drawReady = pendingDrawRequestId === 0n
+  const drawTimerFinished = pendingDrawRequestId === 0n
     && participantCount > 0
     && drawFrequencyEpochs > 0
     && settledEpoch >= lastDrawEpoch + drawFrequencyEpochs;
 
   const drawPending = pendingDrawRequestId !== 0n;
+  const drawReady = drawTimerFinished && liveEntriesKnown && liveEntries > 0;
+  const drawWaitingForLiveEntry = drawTimerFinished && liveEntriesKnown && liveEntries === 0;
   const nextDrawEpoch = drawFrequencyEpochs > 0 ? lastDrawEpoch + drawFrequencyEpochs : 0;
 
   const epochsUntilDraw = drawFrequencyEpochs > 0
@@ -466,6 +471,82 @@ export default function App() {
   useEffect(() => {
     void fetchDrawHistory();
   }, [fetchDrawHistory]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadLiveParticipantCount() {
+      if (!publicClient) {
+        return;
+      }
+
+      if (participantCount === 0) {
+        setLiveParticipantCount(0);
+        return;
+      }
+
+      setLiveParticipantCount(null);
+
+      try {
+        const addressResults = await publicClient.multicall({
+          allowFailure: true,
+          contracts: Array.from({ length: participantCount }, (_, index) => ({
+            address: NARA_LOTTO_POOL_ADDRESS as `0x${string}`,
+            abi: lottoPoolAbi,
+            functionName: "participantAddresses",
+            args: [BigInt(index)] as const,
+          })),
+        }) as Array<{ status: string; result?: unknown }>;
+
+        const participantAddresses = addressResults.flatMap((result) =>
+          result.status === "success" && typeof result.result === "string" ? [result.result as `0x${string}`] : [],
+        );
+
+        if (participantAddresses.length === 0) {
+          if (!cancelled) {
+            setLiveParticipantCount(0);
+          }
+          return;
+        }
+
+        const participantResults = await publicClient.multicall({
+          allowFailure: true,
+          contracts: participantAddresses.map((participantAddress) => ({
+            address: NARA_LOTTO_POOL_ADDRESS as `0x${string}`,
+            abi: lottoPoolAbi,
+            functionName: "userToParticipant",
+            args: [participantAddress] as const,
+          })),
+        }) as Array<{ status: string; result?: unknown }>;
+
+        let nextLiveCount = 0;
+        for (const result of participantResults) {
+          if (result.status !== "success") continue;
+          const participant = result.result as any;
+          const active = Boolean(participant?.isActive ?? participant?.[4] ?? false);
+          const activation = Number(participant?.activationEpoch ?? participant?.[2] ?? 0n);
+          const weight = BigInt(participant?.weight ?? participant?.[3] ?? 0n);
+          if (active && weight > 0n && settledEpoch >= activation) {
+            nextLiveCount += 1;
+          }
+        }
+
+        if (!cancelled) {
+          setLiveParticipantCount(nextLiveCount);
+        }
+      } catch {
+        if (!cancelled) {
+          setLiveParticipantCount(null);
+        }
+      }
+    }
+
+    void loadLiveParticipantCount();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [participantCount, publicClient, settledEpoch]);
 
   // Invalidate queries helper
 
@@ -577,7 +658,12 @@ export default function App() {
         args: [amountWei],
         value: lockFeeWeiRead.data as bigint,
       });
-      setFlash({ tone: "success", text: "You joined the prize pool. Your entry starts counting after a short warm-up." });
+      setFlash({
+        tone: "success",
+        text: drawTimerFinished
+          ? "You joined the prize pool. Your entry is warming up, so the draw should wait until it goes live."
+          : "You joined the prize pool. Your entry starts counting after a short warm-up.",
+      });
       setDepositAmount("");
       invalidateLotto();
     } catch (err) {
@@ -718,12 +804,17 @@ export default function App() {
 
       {/* Context row */}
       <section className="nb-context-row" aria-label="Pool stats">
-        <div className={`nb-ctx-card nb-ctx-timer${drawReady ? " nb-ctx-ready" : ""}${drawPending ? " nb-ctx-pending" : ""}`}>
+        <div className={`nb-ctx-card nb-ctx-timer${drawReady ? " nb-ctx-ready" : ""}${drawPending ? " nb-ctx-pending" : ""}${drawWaitingForLiveEntry ? " nb-ctx-warm" : ""}`}>
           <p className="nb-ctx-label">Draw Status</p>
           {drawPending ? (
             <>
               <p className="nb-ctx-value nb-ctx-vrf">VRF</p>
               <p className="nb-ctx-sub">winner being picked now</p>
+            </>
+          ) : drawWaitingForLiveEntry ? (
+            <>
+              <p className="nb-ctx-value nb-ctx-wait">Warm-up</p>
+              <p className="nb-ctx-sub">timer finished, waiting for a live entry</p>
             </>
           ) : drawReady ? (
             <>
@@ -744,7 +835,11 @@ export default function App() {
           <div className="nb-ctx-prog-track">
             <div className="nb-ctx-prog-fill" style={{ width: `${maxParticipants > 0 ? Math.round((participantCount / maxParticipants) * 100) : 0}%` }} />
           </div>
-          <p className="nb-ctx-sub">{openSpots} spot{openSpots === 1 ? "" : "s"} open</p>
+          <p className="nb-ctx-sub">
+            {liveEntriesKnown
+              ? `${liveEntries} live now - ${openSpots} spot${openSpots === 1 ? "" : "s"} open`
+              : `${openSpots} spot${openSpots === 1 ? "" : "s"} open`}
+          </p>
         </div>
 
         <div className="nb-ctx-card">
@@ -769,9 +864,14 @@ export default function App() {
           Good news - you have a prize ready to claim: {formatNara(winningsNara)} NARA + {formatEth(winningsEth)} ETH
         </div>
       )}
+      {!hasWinnings && drawWaitingForLiveEntry && !drawPending && (
+        <div className="nb-flash neutral">
+          The timer is finished, but there is no live entry yet. Wait until warm-up ends before running the draw.
+        </div>
+      )}
       {!hasWinnings && drawReady && !drawPending && (
         <div className="nb-flash draw-ready">
-          The timer is finished. Anyone can run the draw now.
+          The timer is finished. A live entry exists, so the draw can run now.
         </div>
       )}
       {drawPending && (
@@ -988,7 +1088,7 @@ export default function App() {
                 <span className="nb-rule-num">3</span>
                 <div>
                   <p className="nb-rule-title">Draw runs on the timer</p>
-                  <p className="nb-rule-copy">When the timer is ready, anyone can run the draw. New entries stay open until that happens.</p>
+                  <p className="nb-rule-copy">When the timer is ready and at least one entry is live, anyone can run the draw. Fresh entries still need to finish warm-up first.</p>
                 </div>
               </div>
               <div className="nb-rule-item">
@@ -1044,6 +1144,11 @@ export default function App() {
 
               {isParticipant ? (
                 <>
+                  {drawWaitingForLiveEntry && !entryIsLive && (
+                    <div className="nb-soft-note">
+                      The timer is already finished, but your entry is still warming up. Wait until it goes live before running the first draw.
+                    </div>
+                  )}
                   <div className="nb-entry-topline">
                     <span className={"nb-badge " + (entryIsLive ? "in-draw" : "warming")}>
                       {entryIsLive ? "Live In Draw" : "Warming Up"}
@@ -1134,9 +1239,14 @@ export default function App() {
                 <span className="nb-spinner" />
                 Chainlink VRF is picking the winner...
               </div>
+            ) : drawWaitingForLiveEntry ? (
+              <div>
+                <p className="nb-countdown">Warm-up first</p>
+                <p className="nb-countdown-label">timer finished for epoch {nextDrawEpoch}, but there is no live entry yet</p>
+              </div>
             ) : drawReady ? (
               <div className="nb-draw-status-text">
-                Timer finished for epoch {nextDrawEpoch}. Anyone can run the draw now.
+                Timer finished for epoch {nextDrawEpoch}. A live entry exists, so the draw can run now.
               </div>
             ) : (
               <div>
@@ -1147,7 +1257,7 @@ export default function App() {
           </div>
 
           <p className="nb-draw-explainer">
-            The timer shows when the draw can be run. Entries stay open until someone actually runs it on-chain.
+            The timer shows when a draw window opens. A draw should only be run after at least one entry is live. Fresh entries do not count until their warm-up ends.
           </p>
 
           {!isConnected || isWrongNetwork ? (
@@ -1161,6 +1271,18 @@ export default function App() {
             </div>
           ) : (
             <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+              {drawWaitingForLiveEntry && !drawPending && (
+                <button
+                  type="button"
+                  className="nb-btn-gold"
+                  style={{ width: "auto", minWidth: "220px", marginBottom: 0 }}
+                  disabled
+                  aria-disabled="true"
+                  title="Wait until at least one entry is live before running the draw"
+                >
+                  Waiting For Live Entry
+                </button>
+              )}
               {drawReady && !drawPending && (
                 <button
                   type="button"

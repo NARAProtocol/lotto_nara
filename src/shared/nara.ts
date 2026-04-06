@@ -422,6 +422,7 @@ export const lottoPoolAbi = [
   { name: "potNara", type: "function", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
   { name: "potEth", type: "function", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
   { name: "participantCount", type: "function", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
+  { name: "participantAddresses", type: "function", stateMutability: "view", inputs: [{ name: "", type: "uint256" }], outputs: [{ type: "address" }] },
   { name: "lastDrawEpoch", type: "function", stateMutability: "view", inputs: [], outputs: [{ type: "uint64" }] },
   { name: "launchEpoch", type: "function", stateMutability: "view", inputs: [], outputs: [{ type: "uint64" }] },
   { name: "pendingDrawRequestId", type: "function", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
