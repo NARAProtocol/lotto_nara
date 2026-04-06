@@ -345,7 +345,7 @@ export default function App() {
     if (!publicClient) return;
     try {
       const currentBlock = await publicClient.getBlockNumber();
-      const fromBlock = currentBlock > 5000n ? currentBlock - 5000n : 0n;
+      const fromBlock = currentBlock > 1900n ? currentBlock - 1900n : 0n;
       const logs = await publicClient.getLogs({
         address: NARA_LOTTO_POOL_ADDRESS,
         event: {
