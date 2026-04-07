@@ -430,7 +430,7 @@ export default function App() {
   // Derived values
 
   const epochStateData = epochStateRead.data as any;
-  const liveEpoch = Number((currentEpochRead.data ?? 0n) as bigint);
+  const liveEpoch = Number(BigInt(currentEpochRead.data ?? 0));
   const settledEpoch = Number(epochStateData?.[0] ?? epochStateData?.epoch ?? 0n);
   const currentEpoch = liveEpoch > 0 ? liveEpoch : settledEpoch;
   const backlog = Math.max(0, currentEpoch - settledEpoch);
@@ -469,8 +469,8 @@ export default function App() {
   const entryIsLive = isParticipant && entryStartsInEpochs === 0;
   const unlocksInEpochs = isParticipant ? Math.max(0, unlockEpoch - settledEpoch) : 0;
 
-  const winningsNara = (winningsNaraRead.data ?? 0n) as bigint;
-  const winningsEth = (winningsEthRead.data ?? 0n) as bigint;
+  const winningsNara = BigInt(winningsNaraRead.data ?? 0);
+  const winningsEth = BigInt(winningsEthRead.data ?? 0);
   const hasWinnings = winningsNara > 0n || winningsEth > 0n;
 
   const userOddsPercent = entryIsLive && liveEntriesKnown && liveLottoWeight > 0n && userWeight > 0n
@@ -479,13 +479,13 @@ export default function App() {
       ? 100
       : 0;
 
-  const allowance = (tokenAllowanceRead.data ?? 0n) as bigint;
-  const naraBalance = (tokenBalanceRead.data ?? 0n) as bigint;
-  const nativeBalance = nativeBalanceRead.data?.value ?? 0n;
-  const lockFeeWei = (lockFeeWeiRead.data ?? 0n) as bigint;
-  const unlockFeeWei = (unlockFeeWeiRead.data ?? 0n) as bigint;
-  const lockFeeBps = (lockFeeBpsRead.data ?? 0n) as bigint;
-  const claimFeeBps = (claimFeeBpsRead.data ?? 0n) as bigint;
+  const allowance = BigInt(tokenAllowanceRead.data ?? 0);
+  const naraBalance = BigInt(tokenBalanceRead.data ?? 0);
+  const nativeBalance = BigInt(nativeBalanceRead.data?.value ?? 0);
+  const lockFeeWei = BigInt(lockFeeWeiRead.data ?? 0);
+  const unlockFeeWei = BigInt(unlockFeeWeiRead.data ?? 0);
+  const lockFeeBps = BigInt(lockFeeBpsRead.data ?? 0);
+  const claimFeeBps = BigInt(claimFeeBpsRead.data ?? 0);
   const claimFeeLabel = claimFeeBpsRead.data == null ? 'loading' : formatBps(claimFeeBps);
   const naraBalanceKnown = tokenBalanceRead.data != null;
   const nativeBalanceKnown = nativeBalanceRead.data?.value != null;
@@ -527,7 +527,7 @@ export default function App() {
   const withdrawActionReady = canWithdraw || canWithdrawAfterSync;
   const hasUnlockEthShortfall = withdrawActionReady && nativeBalanceKnown && unlockFeeWei > 0n && nativeBalance < unlockFeeWei;
 
-  const previewWeight = (previewWeightRead.data ?? 0n) as bigint;
+  const previewWeight = BigInt(previewWeightRead.data ?? 0);
   const previewTotalWeight = liveLottoWeight + previewWeight;
   const previewOdds = liveEntriesKnown && previewWeight > 0n && previewTotalWeight > 0n
     ? Number((previewWeight * 10000n) / previewTotalWeight) / 100
@@ -555,7 +555,8 @@ export default function App() {
     if (!publicClient) return;
     try {
       const currentBlock = await publicClient.getBlockNumber();
-      const fromBlock = currentBlock > 1900n ? currentBlock - 1900n : 0n;
+      const LOG_RANGE = 500n;
+      const fromBlock = currentBlock > LOG_RANGE ? currentBlock - LOG_RANGE : 0n;
       const logs = await publicClient.getLogs({
         address: NARA_LOTTO_POOL_ADDRESS,
         event: {
