@@ -923,21 +923,31 @@ export default function App() {
         {/* Jackpot — visual anchor, 10/10 weight */}
         <div className="nb-jackpot">
           <div className="nb-jackpot-shimmer" aria-hidden="true" />
-          <p className="nb-jackpot-eyebrow">Live Prize Pool</p>
+          <div className="nb-jackpot-glow" aria-hidden="true" />
+          <p className="nb-jackpot-eyebrow">
+            <span className="nb-jackpot-dot" />
+            Live Prize Pool
+          </p>
           <div className="nb-jackpot-amount">
             <span className="nb-jackpot-nara">
-              {formatNara(potNara)}<span className="nb-jackpot-unit"> NARA</span>
+              {formatNara(potNara)}
             </span>
-            <span className="nb-jackpot-plus">+</span>
+            <span className="nb-jackpot-currency">NARA</span>
+          </div>
+          <div className="nb-jackpot-divider" aria-hidden="true">
+            <span className="nb-jackpot-plus-icon">+</span>
+          </div>
+          <div className="nb-jackpot-amount nb-jackpot-amount--eth">
             <span className="nb-jackpot-eth">
-              {formatEth(potEth)}<span className="nb-jackpot-unit"> ETH</span>
+              {formatEth(potEth)}
             </span>
+            <span className="nb-jackpot-currency">ETH</span>
           </div>
           <div className="nb-jackpot-meta">
             <span className="nb-jackpot-tag">base mainnet</span>
             <span className="nb-jackpot-tag">principal protected</span>
             <span className="nb-jackpot-tag">chainlink vrf</span>
-            {prizePoolIsEmpty && <span className="nb-jackpot-tag">building now</span>}
+            {prizePoolIsEmpty && <span className="nb-jackpot-tag nb-jackpot-tag--building">accumulating</span>}
           </div>
         </div>
 
