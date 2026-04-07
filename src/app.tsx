@@ -436,18 +436,18 @@ export default function App() {
   const backlog = Math.max(0, currentEpoch - settledEpoch);
   const engineSyncRequired = backlog > 0;
 
-  const potNara = (potNaraRead.data ?? 0n) as bigint;
-  const potEth = (potEthRead.data ?? 0n) as bigint;
+  const potNara = BigInt((potNaraRead.data as any) ?? 0);
+  const potEth = BigInt((potEthRead.data as any) ?? 0);
   const prizePoolIsEmpty = potNara === 0n && potEth === 0n;
-  const participantCount = Number((participantCountRead.data ?? 0n) as bigint);
-  const lastDrawEpoch = Number((lastDrawEpochRead.data ?? 0n) as bigint);
-  const pendingDrawRequestId = (pendingDrawRequestIdRead.data ?? 0n) as bigint;
-  const maxParticipants = poolConfig ? Number(poolConfig.maxParticipants ?? 100n) : 100;
-  const drawFrequencyEpochs = poolConfig ? Number(poolConfig.drawFrequencyEpochs ?? 0n) : 0;
-  const minDepositAmount = poolConfig ? (poolConfig.minDepositAmount as bigint) : 0n;
-  const maxDepositAmount = poolConfig ? (poolConfig.maxDepositAmount as bigint) : 0n;
-  const minDrawPotNara = poolConfig ? (poolConfig.minDrawPotNara as bigint) : 0n;
-  const minDrawPotEth = poolConfig ? (poolConfig.minDrawPotEth as bigint) : 0n;
+  const participantCount = Number(BigInt((participantCountRead.data as any) ?? 0));
+  const lastDrawEpoch = Number(BigInt((lastDrawEpochRead.data as any) ?? 0));
+  const pendingDrawRequestId = BigInt((pendingDrawRequestIdRead.data as any) ?? 0);
+  const maxParticipants = poolConfig ? Number(BigInt(poolConfig.maxParticipants ?? 100)) : 100;
+  const drawFrequencyEpochs = poolConfig ? Number(BigInt(poolConfig.drawFrequencyEpochs ?? 0)) : 0;
+  const minDepositAmount = poolConfig ? BigInt(poolConfig.minDepositAmount ?? 0) : 0n;
+  const maxDepositAmount = poolConfig ? BigInt(poolConfig.maxDepositAmount ?? 0) : 0n;
+  const minDrawPotNara = poolConfig ? BigInt(poolConfig.minDrawPotNara ?? 0) : 0n;
+  const minDrawPotEth = poolConfig ? BigInt(poolConfig.minDrawPotEth ?? 0) : 0n;
   const minPrizeLabel = minDrawPotNara > 0n && minDrawPotEth > 0n
     ? `${formatNara(minDrawPotNara)} NARA or ${formatEth(minDrawPotEth)} ETH`
     : minDrawPotNara > 0n
@@ -622,15 +622,19 @@ export default function App() {
       setLiveParticipantWeight(null);
 
       try {
-        const addressResults = await publicClient.multicall({
-          allowFailure: true,
-          contracts: Array.from({ length: participantCount }, (_, index) => ({
-            address: NARA_LOTTO_POOL_ADDRESS as `0x${string}`,
-            abi: lottoPoolAbi,
-            functionName: "participantAddresses",
-            args: [BigInt(index)] as const,
-          })),
-        }) as Array<{ status: string; result?: unknown }>;
+        const BATCH_SIZE = 25;
+        const addressContracts = Array.from({ length: participantCount }, (_, index) => ({
+          address: NARA_LOTTO_POOL_ADDRESS as `0x${string}`,
+          abi: lottoPoolAbi,
+          functionName: "participantAddresses",
+          args: [BigInt(index)] as const,
+        }));
+        const addressResults: Array<{ status: string; result?: unknown }> = [];
+        for (let i = 0; i < addressContracts.length; i += BATCH_SIZE) {
+          const batch = addressContracts.slice(i, i + BATCH_SIZE);
+          const batchResults = await publicClient.multicall({ allowFailure: true, contracts: batch }) as Array<{ status: string; result?: unknown }>;
+          addressResults.push(...batchResults);
+        }
 
         const participantAddresses = addressResults.flatMap((result) =>
           result.status === "success" && typeof result.result === "string" ? [result.result as `0x${string}`] : [],
@@ -644,15 +648,18 @@ export default function App() {
           return;
         }
 
-        const participantResults = await publicClient.multicall({
-          allowFailure: true,
-          contracts: participantAddresses.map((participantAddress) => ({
-            address: NARA_LOTTO_POOL_ADDRESS as `0x${string}`,
-            abi: lottoPoolAbi,
-            functionName: "userToParticipant",
-            args: [participantAddress] as const,
-          })),
-        }) as Array<{ status: string; result?: unknown }>;
+        const participantContracts = participantAddresses.map((participantAddress) => ({
+          address: NARA_LOTTO_POOL_ADDRESS as `0x${string}`,
+          abi: lottoPoolAbi,
+          functionName: "userToParticipant",
+          args: [participantAddress] as const,
+        }));
+        const participantResults: Array<{ status: string; result?: unknown }> = [];
+        for (let i = 0; i < participantContracts.length; i += BATCH_SIZE) {
+          const batch = participantContracts.slice(i, i + BATCH_SIZE);
+          const batchResults = await publicClient.multicall({ allowFailure: true, contracts: batch }) as Array<{ status: string; result?: unknown }>;
+          participantResults.push(...batchResults);
+        }
 
         let nextLiveCount = 0;
         let nextLiveWeight = 0n;
