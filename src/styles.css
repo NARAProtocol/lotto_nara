@@ -618,6 +618,15 @@ button:focus-visible {
   background: var(--t500-bg);
 }
 
+.nb-flash-link {
+  display: inline-block;
+  margin-left: 10px;
+  color: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 /* ── Main 2-col layout ── */
 /* ── Panels ── */
 .nb-panel {

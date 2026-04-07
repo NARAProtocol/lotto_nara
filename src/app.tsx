@@ -2,12 +2,13 @@ import { useState, useEffect, useCallback } from "react";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import {
   useAccount,
+  useBalance,
   useReadContract,
   useWriteContract,
   usePublicClient,
 } from "wagmi";
 import { useQueryClient } from "@tanstack/react-query";
-import { formatEther, parseEther, type Log } from "viem";
+import { formatEther, parseEther, type Hash, type Log } from "viem";
 
 import {
   NARA_CHAIN_ID,
@@ -27,6 +28,7 @@ type FlashTone = "neutral" | "error" | "success" | "winner" | "draw-ready";
 type Flash = {
   tone: FlashTone;
   text: string;
+  txHash?: Hash;
 };
 
 type DrawRecord = {
@@ -38,6 +40,7 @@ type DrawRecord = {
 };
 
 const MIN_ACTIVE_PLAYERS = 1;
+const HARVEST_BATCH_SIZE = 50n;
 
 // Helpers
 
@@ -51,6 +54,14 @@ function formatNara(wei: bigint): string {
 
 function formatEth(wei: bigint): string {
   return parseFloat(formatEther(wei)).toFixed(4);
+}
+
+function formatBps(bps: bigint): string {
+  return `${(Number(bps) / 100).toLocaleString(undefined, { maximumFractionDigits: 2 })}%`;
+}
+
+function txUrl(hash: Hash): string {
+  return `https://basescan.org/tx/${hash}`;
 }
 
 function epochsToTime(epochs: number): string {
@@ -111,8 +122,32 @@ function describeTxError(label: string, error: unknown): string {
   if (/erc20insufficientallowance|insufficient allowance/.test(raw)) {
     return "Approval amount is too low. Approve again.";
   }
-  if (/epochstale|failed_would_revert|would revert/.test(raw)) {
+  if (/epochstale|epochnotready|failed_would_revert|would revert/.test(raw)) {
     return "The pool timer is behind live time. Run Sync Engine First, then try again.";
+  }
+  if (/principalstilllocked|positionnotmatured/.test(raw)) {
+    return "This lock is not withdrawable yet. Sync the engine and check the unlock epoch again.";
+  }
+  if (/invaliddepositamount/.test(raw)) {
+    return "Entry amount is outside the pool's min/max range.";
+  }
+  if (/alreadyparticipating/.test(raw)) {
+    return "This wallet already has an active entry. Withdraw it before joining again.";
+  }
+  if (/maxparticipantsreached/.test(raw)) {
+    return "The pool is full right now. Wait for a spot to open.";
+  }
+  if (/drawnotready/.test(raw)) {
+    return "The draw is not ready yet. Sync the engine and wait for the draw timer.";
+  }
+  if (/drawalreadypending/.test(raw)) {
+    return "A draw is already pending. Wait for Chainlink VRF to finish.";
+  }
+  if (/nativefeetransferfailed|insufficientfee/.test(raw)) {
+    return "The ETH protocol fee is missing or too low. Check your Base ETH balance and try again.";
+  }
+  if (/nothingtoclaim|notparticipant/.test(raw)) {
+    return label + " found nothing claimable for this wallet. Refresh and check the position again.";
   }
   if (/smart transaction failed|transaction receipt with hash .* could not be found|could not be found|originaltransactionstatus|cancelled|canceled/.test(raw)) {
     return "The wallet dropped this request before Base accepted it. Sync the engine and retry.";
@@ -224,6 +259,7 @@ export default function App() {
   const [drawHistory, setDrawHistory] = useState<DrawRecord[]>([]);
   const [liveParticipantCount, setLiveParticipantCount] = useState<number | null>(null);
   const [copiedAddr, setCopiedAddr] = useState<string | null>(null);
+  const [harvestCursor, setHarvestCursor] = useState(0n);
 
   const isWrongNetwork = Boolean(isConnected && chainId != null && chainId !== NARA_CHAIN_ID);
 
@@ -273,6 +309,17 @@ export default function App() {
     query: { enabled: Boolean(address) },
   });
 
+  const pData = participantDataRead.data as any;
+  const participantCloneAddress = (pData?.cloneAddress ?? pData?.[1]) as `0x${string}` | undefined;
+
+  const participantPositionRead = useReadContract({
+    address: NARA_ENGINE_ADDRESS,
+    abi: engineAbi,
+    functionName: 'positionAt',
+    args: participantCloneAddress ? [participantCloneAddress, 0n] : undefined,
+    query: { enabled: Boolean(participantCloneAddress && !isWrongNetwork) },
+  });
+
   const winningsNaraRead = useReadContract({
     address: NARA_LOTTO_POOL_ADDRESS,
     abi: lottoPoolAbi,
@@ -295,6 +342,32 @@ export default function App() {
     functionName: "allowance",
     args: address ? [address, NARA_LOTTO_POOL_ADDRESS as `0x${string}`] : undefined,
     query: { enabled: Boolean(address) },
+  });
+
+  const tokenBalanceRead = useReadContract({
+    address: NARA_TOKEN_ADDRESS,
+    abi: tokenAbi,
+    functionName: "balanceOf",
+    args: address ? [address] : undefined,
+    query: { enabled: Boolean(address && !isWrongNetwork) },
+  });
+
+  const nativeBalanceRead = useBalance({
+    address,
+    chainId: NARA_CHAIN_ID,
+    query: { enabled: Boolean(address && !isWrongNetwork) },
+  });
+
+  const lockFeeBpsRead = useReadContract({
+    address: NARA_ENGINE_ADDRESS,
+    abi: engineAbi,
+    functionName: "lockFeeBps",
+  });
+
+  const claimFeeBpsRead = useReadContract({
+    address: NARA_ENGINE_ADDRESS,
+    abi: engineAbi,
+    functionName: "claimFeeBps",
   });
 
   const lockFeeWeiRead = useReadContract({
@@ -331,9 +404,14 @@ export default function App() {
   const poolConfig = poolConfigRead.data as any;
   const lockDurationEpochs = poolConfig ? BigInt(poolConfig.lockDurationEpochs ?? 0n) : 0n;
 
-  const amountWei = (() => {
-    try { return depositAmount ? parseEther(depositAmount) : 0n; } catch { return 0n; }
+  const parsedDepositAmount = (() => {
+    const normalized = depositAmount.trim().replace(",", ".");
+    if (!normalized) return { amountWei: 0n, invalid: false };
+    try { return { amountWei: parseEther(normalized), invalid: false }; } catch { return { amountWei: 0n, invalid: true }; }
   })();
+
+  const amountWei = parsedDepositAmount.amountWei;
+  const amountInputInvalid = parsedDepositAmount.invalid;
 
   const previewWeightRead = useReadContract({
     address: NARA_ENGINE_ADDRESS,
@@ -366,15 +444,16 @@ export default function App() {
   const liveEntriesKnown = liveParticipantCount !== null;
   const liveEntries = liveParticipantCount ?? 0;
 
-  const pData = participantDataRead.data as any;
   const isParticipant = Boolean(pData?.isActive ?? (pData && pData[4] === true));
   const userWeight = isParticipant ? BigInt(pData?.weight ?? pData?.[3] ?? 0n) : 0n;
   const activationEpoch = isParticipant ? Number(pData?.activationEpoch ?? pData?.[2] ?? 0n) : 0;
-  const unlockEpoch = isParticipant ? activationEpoch + Number(lockDurationEpochs) : 0;
+  const positionData = participantPositionRead.data as any;
+  const participantNetAmount = isParticipant ? BigInt(positionData?.amount ?? positionData?.[0] ?? 0n) : 0n;
+  const positionUnlockEpoch = isParticipant ? Number(positionData?.unlockEpoch ?? positionData?.[4] ?? 0n) : 0;
+  const unlockEpoch = isParticipant ? (positionUnlockEpoch > 0 ? positionUnlockEpoch : activationEpoch + Number(lockDurationEpochs)) : 0;
   const entryStartsInEpochs = isParticipant ? Math.max(0, activationEpoch - settledEpoch) : 0;
   const entryIsLive = isParticipant && entryStartsInEpochs === 0;
   const unlocksInEpochs = isParticipant ? Math.max(0, unlockEpoch - settledEpoch) : 0;
-  const participantAmount = isParticipant ? BigInt(pData?.weight ?? 0n) : 0n; // weight acts as proxy
 
   const winningsNara = (winningsNaraRead.data ?? 0n) as bigint;
   const winningsEth = (winningsEthRead.data ?? 0n) as bigint;
@@ -386,6 +465,19 @@ export default function App() {
     : 0;
 
   const allowance = (tokenAllowanceRead.data ?? 0n) as bigint;
+  const naraBalance = (tokenBalanceRead.data ?? 0n) as bigint;
+  const nativeBalance = nativeBalanceRead.data?.value ?? 0n;
+  const lockFeeWei = (lockFeeWeiRead.data ?? 0n) as bigint;
+  const unlockFeeWei = (unlockFeeWeiRead.data ?? 0n) as bigint;
+  const lockFeeBps = (lockFeeBpsRead.data ?? 0n) as bigint;
+  const claimFeeBps = (claimFeeBpsRead.data ?? 0n) as bigint;
+  const claimFeeLabel = claimFeeBpsRead.data == null ? 'loading' : formatBps(claimFeeBps);
+  const naraBalanceKnown = tokenBalanceRead.data != null;
+  const nativeBalanceKnown = nativeBalanceRead.data?.value != null;
+  const lockFeeNara = amountWei > 0n ? (amountWei * lockFeeBps) / 10000n : 0n;
+  const netLockAmount = amountWei > lockFeeNara ? amountWei - lockFeeNara : 0n;
+  const hasNaraShortfall = amountWei > 0n && naraBalanceKnown && naraBalance < amountWei;
+  const hasLockEthShortfall = amountWei > 0n && nativeBalanceKnown && lockFeeWei > 0n && nativeBalance < lockFeeWei;
   const isApproved = amountWei > 0n && allowance >= amountWei;
 
   const drawTimerFinished = pendingDrawRequestId === 0n
@@ -403,30 +495,49 @@ export default function App() {
     : 0;
 
   const canDeposit = !isParticipant
+    && Boolean(poolConfig)
+    && !amountInputInvalid
     && amountWei >= minDepositAmount
     && (maxDepositAmount === 0n || amountWei <= maxDepositAmount)
-    && participantCount < maxParticipants;
+    && participantCount < maxParticipants
+    && !hasNaraShortfall
+    && !hasLockEthShortfall;
 
   const lockProgressPct = isParticipant && lockDurationEpochs > 0n
     ? Math.min(100, Math.max(0, Math.round(((settledEpoch - activationEpoch) / Number(lockDurationEpochs)) * 100)))
     : 0;
 
   const canWithdraw = isParticipant && settledEpoch >= unlockEpoch;
+  const canWithdrawAfterSync = isParticipant && !canWithdraw && engineSyncRequired && liveEpoch >= unlockEpoch;
+  const withdrawActionReady = canWithdraw || canWithdrawAfterSync;
+  const hasUnlockEthShortfall = withdrawActionReady && nativeBalanceKnown && unlockFeeWei > 0n && nativeBalance < unlockFeeWei;
 
   const previewWeight = (previewWeightRead.data ?? 0n) as bigint;
   const previewOdds = activeTotalWeight > 0n && previewWeight > 0n
     ? Number(((previewWeight) * 10000n) / (activeTotalWeight + previewWeight)) / 100
     : 0;
 
-  const amountError = amountWei > 0n
-    ? amountWei < minDepositAmount
-      ? `Minimum entry is ${formatNara(minDepositAmount)} NARA.`
-      : maxDepositAmount > 0n && amountWei > maxDepositAmount
-        ? `Maximum entry is ${formatNara(maxDepositAmount)} NARA.`
-        : openSpots === 0
-          ? "The pool is full right now. Please wait for an open spot."
-          : null
-    : null;
+  const amountError = amountInputInvalid
+    ? "Enter a valid NARA amount like 100 or 100.5."
+    : amountWei > 0n
+      ? amountWei < minDepositAmount
+        ? `Minimum entry is ${formatNara(minDepositAmount)} NARA.`
+        : maxDepositAmount > 0n && amountWei > maxDepositAmount
+          ? `Maximum entry is ${formatNara(maxDepositAmount)} NARA.`
+          : openSpots === 0
+            ? "The pool is full right now. Please wait for an open spot."
+            : hasNaraShortfall
+              ? `Wallet has ${formatNara(naraBalance)} NARA. You need ${formatNara(amountWei)} NARA.`
+              : hasLockEthShortfall
+                ? `You need at least ${formatEth(lockFeeWei)} ETH on Base for the join fee, plus gas.`
+                : null
+      : null;
+
+  const participantCountBigInt = BigInt(Math.max(0, participantCount));
+  const activeHarvestCursor = participantCountBigInt > 0n ? harvestCursor % participantCountBigInt : 0n;
+  const harvestBatchEnd = participantCountBigInt > 0n
+    ? (activeHarvestCursor + HARVEST_BATCH_SIZE > participantCountBigInt ? participantCountBigInt : activeHarvestCursor + HARVEST_BATCH_SIZE)
+    : 0n;
 
   // Draw history fetch
 
@@ -472,6 +583,13 @@ export default function App() {
   useEffect(() => {
     void fetchDrawHistory();
   }, [fetchDrawHistory]);
+
+  useEffect(() => {
+    const count = BigInt(Math.max(0, participantCount));
+    if (count === 0n || harvestCursor >= count) {
+      setHarvestCursor(0n);
+    }
+  }, [harvestCursor, participantCount]);
 
   useEffect(() => {
     let cancelled = false;
@@ -591,20 +709,50 @@ export default function App() {
     return true;
   }, [isConnected, isWrongNetwork]);
 
+  const ensureTransactionReady = useCallback((action: string) => {
+    if (!ensureWalletReady(action)) return false;
+    if (!publicClient) {
+      setFlash({ tone: "error", text: "Base RPC is not ready yet. Wait a moment and try again." });
+      return false;
+    }
+    return true;
+  }, [ensureWalletReady, publicClient]);
+
+  const ensureEngineSynced = useCallback((action: string) => {
+    if (!engineSyncRequired) return true;
+    setFlash({
+      tone: "error",
+      text: `The pool timer is ${backlog} epoch${backlog === 1 ? "" : "s"} behind live time. Run Sync Engine First, then ${action}.`,
+    });
+    return false;
+  }, [backlog, engineSyncRequired]);
+
+  const waitForConfirmation = useCallback(async (hash: Hash, label: string) => {
+    if (!publicClient) throw new Error("Base RPC is not ready yet.");
+    setFlash({ tone: "neutral", text: `${label} submitted. Waiting for Base confirmation.`, txHash: hash });
+    const receipt = await publicClient.waitForTransactionReceipt({ hash });
+    if (receipt.status === "reverted") {
+      throw new Error(`${label} reverted on Base.`);
+    }
+    return receipt;
+  }, [publicClient]);
+
   // Tx handlers
 
   const handleApprove = async () => {
-    if (!ensureWalletReady("approve NARA") || !depositAmount || amountWei === 0n) return;
+    if (!ensureTransactionReady("approve NARA") || !depositAmount || amountWei === 0n || amountError) return;
     setTxStep("approving");
-    setFlash({ tone: "neutral", text: "Step 1 of 2 - Approving NARA spend. Confirm in your wallet." });
+    setFlash({ tone: "neutral", text: `Step 1 of 2 - Approve ${formatNara(amountWei)} NARA for the prize pool. Confirm in your wallet.` });
     try {
-      await writeContractAsync({
+      const hash = await writeContractAsync({
         address: NARA_TOKEN_ADDRESS,
         abi: tokenAbi,
         functionName: "approve",
         args: [NARA_LOTTO_POOL_ADDRESS as `0x${string}`, amountWei],
       });
-      setFlash({ tone: "success", text: "Approval complete. You can now join the prize pool." });
+      await waitForConfirmation(hash, "Approval");
+      setFlash({ tone: "success", text: `${formatNara(amountWei)} NARA approval confirmed for the prize pool.`, txHash: hash });
+      await tokenAllowanceRead.refetch();
       invalidateLotto();
     } catch (err) {
       setFlash({ tone: "error", text: describeTxError("Approval", err) });
@@ -613,10 +761,10 @@ export default function App() {
     }
   };
 
-  const handleSyncEngine = async () => {
-    if (!ensureWalletReady("sync the pool timer") || !publicClient || !engineSyncRequired) return;
+  const handleSyncEngine = async (nextAction = "continue") => {
+    if (!ensureTransactionReady("sync the pool timer") || !engineSyncRequired) return;
     setTxStep("syncing");
-    setFlash({ tone: "neutral", text: `Syncing ${backlog} epoch${backlog === 1 ? "" : "s"} so joins settle cleanly.` });
+    setFlash({ tone: "neutral", text: `Syncing ${backlog} epoch${backlog === 1 ? "" : "s"} before you ${nextAction}. Confirm in your wallet.` });
     try {
       const hash = backlog > 1
         ? await writeContractAsync({
@@ -630,9 +778,9 @@ export default function App() {
             abi: engineAbi,
             functionName: "advanceEpoch",
           });
-      await publicClient.waitForTransactionReceipt({ hash });
+      await waitForConfirmation(hash, "Engine sync");
       await refreshEpochStatus();
-      setFlash({ tone: "success", text: "Pool timer synced. You can join now." });
+      setFlash({ tone: "success", text: `Pool timer synced. You can ${nextAction} now.`, txHash: hash });
     } catch (err) {
       setFlash({ tone: "error", text: describeTxError("Sync", err) });
     } finally {
@@ -641,29 +789,25 @@ export default function App() {
   };
 
   const handleDeposit = async () => {
-    if (!ensureWalletReady("enter the draw") || !depositAmount || !lockFeeWeiRead.data) return;
-    if (engineSyncRequired) {
-      setFlash({
-        tone: "error",
-        text: `The pool timer is ${backlog} epoch${backlog === 1 ? "" : "s"} behind live time. Run Sync Engine First, then join.`
-      });
-      return;
-    }
+    if (!ensureTransactionReady("enter the draw") || !depositAmount || lockFeeWeiRead.data == null || amountError) return;
+    if (!ensureEngineSynced("join")) return;
     setTxStep("depositing");
-    setFlash({ tone: "neutral", text: "Step 2 of 2 - Joining the prize pool. Confirm in your wallet." });
+    setFlash({ tone: "neutral", text: `Step 2 of 2 - Joining with ${formatNara(amountWei)} NARA. This sends ${formatEth(lockFeeWei)} ETH fee plus gas.` });
     try {
-      await writeContractAsync({
+      const hash = await writeContractAsync({
         address: NARA_LOTTO_POOL_ADDRESS,
         abi: lottoPoolAbi,
         functionName: "deposit",
         args: [amountWei],
-        value: lockFeeWeiRead.data as bigint,
+        value: lockFeeWei,
       });
+      await waitForConfirmation(hash, "Join pool");
       setFlash({
         tone: "success",
         text: drawTimerFinished
           ? "You joined the prize pool. Your entry is warming up, so the draw should wait until it goes live."
           : "You joined the prize pool. Your entry starts counting after a short warm-up.",
+        txHash: hash,
       });
       setDepositAmount("");
       invalidateLotto();
@@ -675,17 +819,23 @@ export default function App() {
   };
 
   const handleWithdraw = async () => {
-    if (!ensureWalletReady("withdraw principal") || !unlockFeeWeiRead.data) return;
+    if (!ensureTransactionReady("withdraw principal") || unlockFeeWeiRead.data == null) return;
+    if (!ensureEngineSynced("withdraw")) return;
+    if (hasUnlockEthShortfall) {
+      setFlash({ tone: "error", text: `You need at least ${formatEth(unlockFeeWei)} ETH on Base for the unlock fee, plus gas.` });
+      return;
+    }
     setTxStep("withdrawing");
-    setFlash({ tone: "neutral", text: "Withdrawing your locked NARA. Confirm in your wallet." });
+    setFlash({ tone: "neutral", text: `Withdrawing your net locked NARA. This sends ${formatEth(unlockFeeWei)} ETH unlock fee plus gas.` });
     try {
-      await writeContractAsync({
+      const hash = await writeContractAsync({
         address: NARA_LOTTO_POOL_ADDRESS,
         abi: lottoPoolAbi,
         functionName: "withdraw",
-        value: unlockFeeWeiRead.data as bigint,
+        value: unlockFeeWei,
       });
-      setFlash({ tone: "success", text: "Your locked NARA is back in your wallet." });
+      await waitForConfirmation(hash, "Withdrawal");
+      setFlash({ tone: "success", text: "Withdrawal confirmed. Your net locked NARA was sent back to your wallet.", txHash: hash });
       invalidateLotto();
     } catch (err) {
       setFlash({ tone: "error", text: describeTxError("Withdrawal", err) });
@@ -695,16 +845,18 @@ export default function App() {
   };
 
   const handleDrawWinner = async () => {
-    if (!ensureWalletReady("trigger the draw")) return;
+    if (!ensureTransactionReady("trigger the draw")) return;
+    if (!ensureEngineSynced("run the draw")) return;
     setTxStep("drawing");
     setFlash({ tone: "neutral", text: "Running the prize draw. Chainlink VRF will pick the winner." });
     try {
-      await writeContractAsync({
+      const hash = await writeContractAsync({
         address: NARA_LOTTO_POOL_ADDRESS,
         abi: lottoPoolAbi,
         functionName: "drawWinner",
       });
-      setFlash({ tone: "neutral", text: "Prize draw requested. Waiting for Chainlink VRF randomness..." });
+      await waitForConfirmation(hash, "Draw request");
+      setFlash({ tone: "neutral", text: "Prize draw request confirmed. Waiting for Chainlink VRF randomness.", txHash: hash });
       invalidateLotto();
       fetchDrawHistory();
     } catch (err) {
@@ -715,16 +867,17 @@ export default function App() {
   };
 
   const handleClaimWinnings = async () => {
-    if (!ensureWalletReady("claim winnings")) return;
+    if (!ensureTransactionReady("claim winnings")) return;
     setTxStep("claiming");
     setFlash({ tone: "neutral", text: "Claiming your prize. Confirm in your wallet." });
     try {
-      await writeContractAsync({
+      const hash = await writeContractAsync({
         address: NARA_LOTTO_POOL_ADDRESS,
         abi: lottoPoolAbi,
         functionName: "claimWinnings",
       });
-      setFlash({ tone: "success", text: "Winnings claimed and sent to your wallet." });
+      await waitForConfirmation(hash, "Prize claim");
+      setFlash({ tone: "success", text: "Winnings claim confirmed and sent to your wallet.", txHash: hash });
       invalidateLotto();
     } catch (err) {
       setFlash({ tone: "error", text: describeTxError("Claim", err) });
@@ -734,17 +887,31 @@ export default function App() {
   };
 
   const handleHarvest = async () => {
-    if (!ensureWalletReady("harvest yield")) return;
+    if (!ensureTransactionReady("harvest yield")) return;
+    if (!ensureEngineSynced("move yield")) return;
+    if (participantCountBigInt === 0n) {
+      setFlash({ tone: "error", text: "There are no active entries to harvest yet." });
+      return;
+    }
     setTxStep("harvesting");
-    setFlash({ tone: "neutral", text: "Moving fresh yield into the prize pool..." });
+    setFlash({ tone: "neutral", text: `Moving yield for entries ${Number(activeHarvestCursor) + 1}-${Number(harvestBatchEnd)} of ${participantCount}.` });
     try {
-      await writeContractAsync({
+      const hash = await writeContractAsync({
         address: NARA_LOTTO_POOL_ADDRESS,
         abi: lottoPoolAbi,
         functionName: "harvestBatch",
-        args: [0n, 50n],
+        args: [activeHarvestCursor, HARVEST_BATCH_SIZE],
       });
-      setFlash({ tone: "success", text: "Fresh yield was added to the prize pool." });
+      await waitForConfirmation(hash, "Yield harvest");
+      const nextCursor = harvestBatchEnd >= participantCountBigInt ? 0n : harvestBatchEnd;
+      setHarvestCursor(nextCursor);
+      setFlash({
+        tone: "success",
+        text: nextCursor === 0n
+          ? "Yield harvest batch confirmed. All current entry batches have been covered."
+          : `Yield harvest batch confirmed. Next click resumes at entry ${Number(nextCursor) + 1}.`,
+        txHash: hash,
+      });
       invalidateLotto();
     } catch (err) {
       setFlash({ tone: "error", text: describeTxError("Harvest", err) });
@@ -797,12 +964,12 @@ export default function App() {
         </div>
         <p className="nb-jackpot-sub">
           {prizePoolIsEmpty
-            ? "The first locked entries start building the yield prize. Your principal remains withdrawable after the lock period."
-            : "Lock NARA, keep your principal, and one live entry wins the pooled yield."}
+            ? "The first locked entries start building the yield prize. Your net locked principal is withdrawable after the lock period."
+            : "Lock NARA, keep your net locked principal, and one live entry wins the pooled yield."}
         </p>
         <div className="nb-jackpot-tags">
           <span className="nb-jackpot-tag">live on base</span>
-          <span className="nb-jackpot-tag">principal protected</span>
+          <span className="nb-jackpot-tag">net principal protected</span>
           <span className="nb-jackpot-tag">{MIN_ACTIVE_PLAYERS} live player needed</span>
           <span className="nb-jackpot-tag">chainlink vrf</span>
         </div>
@@ -893,6 +1060,11 @@ export default function App() {
       {flash && (
         <div className={`nb-flash ${flash.tone}`} role="alert" aria-live="polite">
           {flash.text}
+          {flash.txHash && (
+            <a href={txUrl(flash.txHash)} target="_blank" rel="noopener noreferrer" className="nb-flash-link">
+              View tx -&gt;
+            </a>
+          )}
           <button
             type="button"
             onClick={() => setFlash(null)}
@@ -913,7 +1085,7 @@ export default function App() {
             <div>
               <h2 className="nb-panel-header">Join The Prize Pool</h2>
               <p className="nb-panel-intro">
-                Choose how much NARA to lock, approve once, then join. Your principal stays yours while the yield builds the prize pool.
+                Choose how much NARA to lock, approve once, then join. The engine takes protocol fees; the net locked principal stays withdrawable after the lock period.
               </p>
             </div>
             <span className="nb-badge not-in-draw">{openSpots} spot{openSpots === 1 ? "" : "s"} open</span>
@@ -999,12 +1171,42 @@ export default function App() {
                 {amountError && <p className="nb-input-error">{amountError}</p>}
               </div>
 
-              {amountWei > 0n && previewWeight > 0n && (
+              {amountWei > 0n && (
                 <div className="nb-preview-card">
                   <p className="nb-panel-header">Quick Check</p>
                   <div className="nb-data-row" style={{ borderTop: "none", paddingTop: 0 }}>
                     <span className="nb-data-label">Estimated odds</span>
-                    <span className="nb-data-value">{previewOdds.toFixed(2)}%</span>
+                    <span className="nb-data-value">{previewWeight > 0n ? previewOdds.toFixed(2) + "%" : "Loading..."}</span>
+                  </div>
+                  <div className="nb-data-row">
+                    <span className="nb-data-label">NARA lock fee</span>
+                    <span className="nb-data-value">{formatNara(lockFeeNara)} NARA ({formatBps(lockFeeBps)})</span>
+                  </div>
+                  <div className="nb-data-row">
+                    <span className="nb-data-label">Net principal locked</span>
+                    <span className="nb-data-value">{formatNara(netLockAmount)} NARA</span>
+                  </div>
+                  <div className="nb-data-row">
+                    <span className="nb-data-label">Join ETH fee</span>
+                    <span className="nb-data-value">{formatEth(lockFeeWei)} ETH + gas</span>
+                  </div>
+                  <div className="nb-data-row">
+                    <span className="nb-data-label">Withdraw ETH fee later</span>
+                    <span className="nb-data-value">{formatEth(unlockFeeWei)} ETH + gas</span>
+                  </div>
+                  <div className='nb-data-row'>
+                    <span className='nb-data-label'>ETH yield fee</span>
+                    <span className='nb-data-value'>
+                      {claimFeeLabel === 'loading' ? 'Loading...' : `${claimFeeLabel} before ETH reaches the prize pool`}
+                    </span>
+                  </div>
+                  <div className="nb-data-row">
+                    <span className="nb-data-label">Approval recipient</span>
+                    <span className="nb-data-value">
+                      <a href={`https://basescan.org/address/${NARA_LOTTO_POOL_ADDRESS}`} target="_blank" rel="noopener noreferrer" className="nb-view-link">
+                        {shortAddress(NARA_LOTTO_POOL_ADDRESS)}
+                      </a>
+                    </span>
                   </div>
                   <div className="nb-data-row">
                     <span className="nb-data-label">Starts counting</span>
@@ -1044,13 +1246,13 @@ export default function App() {
                       <span className="nb-sr-only">Approving...</span>
                       Approving...
                     </>
-                  ) : isApproved ? "Approved" : "Approve NARA"}
+                  ) : isApproved ? "Approved" : amountWei > 0n ? `Approve ${formatNara(amountWei)} NARA` : "Approve NARA"}
                 </button>
 
                 <button
                   type="button"
                   className="nb-btn-primary"
-                  onClick={engineSyncRequired ? handleSyncEngine : handleDeposit}
+                  onClick={engineSyncRequired ? () => handleSyncEngine("join") : handleDeposit}
                   disabled={engineSyncRequired ? isBusy || !publicClient : isBusy || !isApproved || !canDeposit || amountWei === 0n}
                   aria-disabled={engineSyncRequired ? isBusy || !publicClient : !canDeposit || !isApproved || isBusy}
                   aria-busy={txStep === "syncing" || txStep === "depositing"}
@@ -1101,7 +1303,7 @@ export default function App() {
                 <span className="nb-rule-num">4</span>
                 <div>
                   <p className="nb-rule-title">Withdraw later</p>
-                  <p className="nb-rule-copy">Your principal stays locked for {epochsToTime(Number(lockDurationEpochs))}, then you can withdraw it back to your wallet.</p>
+                  <p className="nb-rule-copy">Your net principal stays locked for {epochsToTime(Number(lockDurationEpochs))}, then you can withdraw it back to your wallet after the engine is synced.</p>
                 </div>
               </div>
             </div>
@@ -1130,6 +1332,7 @@ export default function App() {
                   <p className="nb-winner-callout-amounts">
                     {formatNara(winningsNara)} NARA + {formatEth(winningsEth)} ETH
                   </p>
+                  <p className='nb-input-helper'>ETH yield reaches the prize pool after the {claimFeeLabel} engine fee; claiming this prize pays wallet gas only.</p>
                   <button
                     type="button"
                     className="nb-btn-gold"
@@ -1171,17 +1374,21 @@ export default function App() {
                       <span className="nb-status-label">Your odds</span>
                       <strong className="nb-status-value">{entryIsLive ? userOddsPercent.toFixed(2) + "%" : "After warm-up"}</strong>
                     </div>
+                    <div className='nb-status-card'>
+                      <span className='nb-status-label'>Net locked</span>
+                      <strong className='nb-status-value'>{participantNetAmount > 0n ? formatNara(participantNetAmount) + ' NARA' : 'Loading...'}</strong>
+                    </div>
                     <div className="nb-status-card">
                       <span className="nb-status-label">Starts counting</span>
                       <strong className="nb-status-value">{entryIsLive ? "Live now" : epochsToTime(entryStartsInEpochs)}</strong>
                     </div>
                     <div className="nb-status-card">
                       <span className="nb-status-label">Withdraw opens</span>
-                      <strong className="nb-status-value">{canWithdraw ? "Now" : epochsToDate(currentEpoch, unlocksInEpochs)}</strong>
+                      <strong className="nb-status-value">{canWithdraw ? "Now" : canWithdrawAfterSync ? "After sync" : epochsToDate(currentEpoch, unlocksInEpochs)}</strong>
                     </div>
                     <div className="nb-status-card">
                       <span className="nb-status-label">Time left</span>
-                      <strong className="nb-status-value">{canWithdraw ? "Ready now" : epochsToTime(unlocksInEpochs)}</strong>
+                      <strong className="nb-status-value">{canWithdraw ? "Ready now" : canWithdrawAfterSync ? "Sync first" : epochsToTime(unlocksInEpochs)}</strong>
                     </div>
                   </div>
 
@@ -1197,26 +1404,46 @@ export default function App() {
                     >
                       <div className="nb-prog-fill" style={{ width: String(lockProgressPct) + "%" }} />
                     </div>
-                    <p className="nb-input-hint">{canWithdraw ? "Your principal can be withdrawn now." : "Unlocks on " + epochsToDate(currentEpoch, unlocksInEpochs) + "."}</p>
+                    <p className="nb-input-hint">{withdrawActionReady ? (engineSyncRequired ? "Sync the engine first, then withdraw." : "Your net principal can be withdrawn now.") : "Unlocks on " + epochsToDate(currentEpoch, unlocksInEpochs) + "."}</p>
                   </div>
+
+                  {withdrawActionReady && engineSyncRequired && (
+                    <div className="nb-soft-note">
+                      The unlock time has passed, but the engine is {backlog} epoch{backlog === 1 ? "" : "s"} behind live time. Sync first so MetaMask does not simulate a failing withdrawal.
+                    </div>
+                  )}
+                  {canWithdraw && !engineSyncRequired && (
+                    <div className="nb-soft-note">
+                      Withdrawal sends the {formatEth(unlockFeeWei)} ETH unlock fee plus gas, then returns your net locked NARA.
+                    </div>
+                  )}
+                  {hasUnlockEthShortfall && (
+                    <p className="nb-input-error">You need at least {formatEth(unlockFeeWei)} ETH on Base for the unlock fee, plus gas.</p>
+                  )}
 
                   <button
                     type="button"
                     className="nb-btn-secondary"
-                    onClick={handleWithdraw}
-                    disabled={isBusy || !canWithdraw}
-                    title={canWithdraw ? "Withdraw principal" : "Unlocks at epoch " + unlockEpoch + " (" + epochsToDate(currentEpoch, Math.max(0, unlockEpoch - currentEpoch)) + ")"}
-                    aria-disabled={!canWithdraw || isBusy}
-                    aria-busy={txStep === "withdrawing"}
+                    onClick={engineSyncRequired && withdrawActionReady ? () => handleSyncEngine("withdraw") : handleWithdraw}
+                    disabled={isBusy || !withdrawActionReady || (!engineSyncRequired && hasUnlockEthShortfall)}
+                    title={withdrawActionReady ? (engineSyncRequired ? "Sync engine before withdrawing" : "Withdraw net locked principal") : "Unlocks at epoch " + unlockEpoch + " (" + epochsToDate(currentEpoch, Math.max(0, unlockEpoch - currentEpoch)) + ")"}
+                    aria-disabled={!withdrawActionReady || isBusy || (!engineSyncRequired && hasUnlockEthShortfall)}
+                    aria-busy={txStep === "withdrawing" || txStep === "syncing"}
                   >
-                    {txStep === "withdrawing" ? (
+                    {txStep === "syncing" ? (
+                      <>
+                        <span className="nb-spinner" aria-hidden="true" />
+                        <span className="nb-sr-only">Syncing...</span>
+                        Syncing...
+                      </>
+                    ) : txStep === "withdrawing" ? (
                       <>
                         <span className="nb-spinner" aria-hidden="true" />
                         <span className="nb-sr-only">Withdrawing...</span>
                         Withdrawing...
                       </>
-                    ) : canWithdraw
-                        ? "Withdraw NARA"
+                    ) : withdrawActionReady
+                        ? (engineSyncRequired ? "Sync Engine First" : "Withdraw NARA")
                         : "Available at epoch " + unlockEpoch}
                   </button>
                 </>
@@ -1264,6 +1491,7 @@ export default function App() {
 
           <p className="nb-draw-explainer">
             The timer shows when a draw window opens. A draw should only be run after at least one entry is live. Fresh entries do not count until their warm-up ends.
+            {engineSyncRequired ? ` The engine is ${backlog} epoch${backlog === 1 ? "" : "s"} behind, so sync before moving yield, drawing, or withdrawing.` : ""}
           </p>
 
           {!isConnected || isWrongNetwork ? (
@@ -1277,6 +1505,18 @@ export default function App() {
             </div>
           ) : (
             <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+              {engineSyncRequired && !drawPending && (
+                <button
+                  type="button"
+                  className="nb-btn-gold"
+                  style={{ width: "auto", minWidth: "180px", marginBottom: 0 }}
+                  onClick={() => handleSyncEngine("continue")}
+                  disabled={isBusy || !publicClient}
+                  aria-busy={txStep === "syncing"}
+                >
+                  {txStep === "syncing" ? "Syncing..." : "Sync Engine First"}
+                </button>
+              )}
               {drawWaitingForLiveEntry && !drawPending && (
                 <button
                   type="button"
@@ -1289,7 +1529,7 @@ export default function App() {
                   Waiting For Live Entry
                 </button>
               )}
-              {drawReady && !drawPending && (
+              {drawReady && !drawPending && !engineSyncRequired && (
                 <button
                   type="button"
                   className="nb-btn-gold"
@@ -1311,11 +1551,11 @@ export default function App() {
                 type="button"
                 className="nb-btn-secondary"
                 style={{ width: "auto", minWidth: "140px", marginBottom: 0 }}
-                onClick={handleHarvest}
-                disabled={isBusy}
+                onClick={engineSyncRequired ? () => handleSyncEngine("move yield") : handleHarvest}
+                disabled={isBusy || participantCount === 0 || (engineSyncRequired && !publicClient)}
                 title="Move available yield from participant positions into the prize pool"
               >
-                {txStep === "harvesting" ? "Moving Yield..." : "Move Yield To Pool"}
+                {txStep === "syncing" ? "Syncing..." : txStep === "harvesting" ? "Moving Yield..." : engineSyncRequired ? "Sync Before Yield" : participantCount > 50 ? `Move Yield ${Number(activeHarvestCursor) + 1}-${Number(harvestBatchEnd)}` : "Move Yield To Pool"}
               </button>
             </div>
           )}
@@ -1393,7 +1633,7 @@ export default function App() {
           NARA Token
         </a>
         <span className="nb-trust-pill">Chainlink VRF</span>
-        <span className="nb-trust-pill">Principal Protected</span>
+        <span className="nb-trust-pill">Net Principal Protected</span>
         <a
           href="https://github.com/NARAProtocol/lotto_nara"
           target="_blank"
