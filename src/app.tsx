@@ -267,6 +267,7 @@ export default function App() {
   const [txStep, setTxStep] = useState<"idle" | "approving" | "syncing" | "depositing" | "withdrawing" | "drawing" | "claiming" | "harvesting">("idle");
   const [drawHistory, setDrawHistory] = useState<DrawRecord[]>([]);
   const [liveParticipantCount, setLiveParticipantCount] = useState<number | null>(null);
+  const [liveParticipantWeight, setLiveParticipantWeight] = useState<bigint | null>(null);
   const [copiedAddr, setCopiedAddr] = useState<string | null>(null);
   const [harvestCursor, setHarvestCursor] = useState(0n);
 
@@ -403,12 +404,6 @@ export default function App() {
     functionName: "epochState",
   });
 
-  const activeTotalWeightRead = useReadContract({
-    address: NARA_ENGINE_ADDRESS,
-    abi: engineAbi,
-    functionName: "activeTotalWeight",
-  });
-
   // Preview weight when amount is entered
   const poolConfig = poolConfigRead.data as any;
   const lockDurationEpochs = poolConfig ? BigInt(poolConfig.lockDurationEpochs ?? 0n) : 0n;
@@ -450,8 +445,9 @@ export default function App() {
   const minDepositAmount = poolConfig ? (poolConfig.minDepositAmount as bigint) : 0n;
   const maxDepositAmount = poolConfig ? (poolConfig.maxDepositAmount as bigint) : 0n;
   const openSpots = Math.max(0, maxParticipants - participantCount);
-  const liveEntriesKnown = liveParticipantCount !== null;
+  const liveEntriesKnown = liveParticipantCount !== null && liveParticipantWeight !== null;
   const liveEntries = liveParticipantCount ?? 0;
+  const liveLottoWeight = liveParticipantWeight ?? 0n;
 
   const isParticipant = Boolean(pData?.isActive ?? (pData && pData[4] === true));
   const userWeight = isParticipant ? BigInt(pData?.weight ?? pData?.[3] ?? 0n) : 0n;
@@ -468,10 +464,11 @@ export default function App() {
   const winningsEth = (winningsEthRead.data ?? 0n) as bigint;
   const hasWinnings = winningsNara > 0n || winningsEth > 0n;
 
-  const activeTotalWeight = (activeTotalWeightRead.data ?? 0n) as bigint;
-  const userOddsPercent = entryIsLive && activeTotalWeight > 0n && userWeight > 0n
-    ? Number((userWeight * 10000n) / activeTotalWeight) / 100
-    : 0;
+  const userOddsPercent = entryIsLive && liveEntriesKnown && liveLottoWeight > 0n && userWeight > 0n
+    ? Number((userWeight * 10000n) / liveLottoWeight) / 100
+    : entryIsLive && liveEntriesKnown && liveEntries === 1
+      ? 100
+      : 0;
 
   const allowance = (tokenAllowanceRead.data ?? 0n) as bigint;
   const naraBalance = (tokenBalanceRead.data ?? 0n) as bigint;
@@ -522,8 +519,9 @@ export default function App() {
   const hasUnlockEthShortfall = withdrawActionReady && nativeBalanceKnown && unlockFeeWei > 0n && nativeBalance < unlockFeeWei;
 
   const previewWeight = (previewWeightRead.data ?? 0n) as bigint;
-  const previewOdds = activeTotalWeight > 0n && previewWeight > 0n
-    ? Number(((previewWeight) * 10000n) / (activeTotalWeight + previewWeight)) / 100
+  const previewTotalWeight = liveLottoWeight + previewWeight;
+  const previewOdds = liveEntriesKnown && previewWeight > 0n && previewTotalWeight > 0n
+    ? Number((previewWeight * 10000n) / previewTotalWeight) / 100
     : 0;
 
   const amountError = amountInputInvalid
@@ -608,12 +606,24 @@ export default function App() {
         return;
       }
 
+      if (participantCountRead.data == null) {
+        if (!cancelled) {
+          setLiveParticipantCount(null);
+          setLiveParticipantWeight(null);
+        }
+        return;
+      }
+
       if (participantCount === 0) {
-        setLiveParticipantCount(0);
+        if (!cancelled) {
+          setLiveParticipantCount(0);
+          setLiveParticipantWeight(0n);
+        }
         return;
       }
 
       setLiveParticipantCount(null);
+      setLiveParticipantWeight(null);
 
       try {
         const addressResults = await publicClient.multicall({
@@ -633,6 +643,7 @@ export default function App() {
         if (participantAddresses.length === 0) {
           if (!cancelled) {
             setLiveParticipantCount(0);
+            setLiveParticipantWeight(0n);
           }
           return;
         }
@@ -648,6 +659,7 @@ export default function App() {
         }) as Array<{ status: string; result?: unknown }>;
 
         let nextLiveCount = 0;
+        let nextLiveWeight = 0n;
         for (const result of participantResults) {
           if (result.status !== "success") continue;
           const participant = result.result as any;
@@ -656,15 +668,18 @@ export default function App() {
           const weight = BigInt(participant?.weight ?? participant?.[3] ?? 0n);
           if (active && weight > 0n && settledEpoch >= activation) {
             nextLiveCount += 1;
+            nextLiveWeight += weight;
           }
         }
 
         if (!cancelled) {
           setLiveParticipantCount(nextLiveCount);
+          setLiveParticipantWeight(nextLiveWeight);
         }
       } catch {
         if (!cancelled) {
           setLiveParticipantCount(null);
+          setLiveParticipantWeight(null);
         }
       }
     }
@@ -674,7 +689,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [participantCount, publicClient, settledEpoch]);
+  }, [participantCount, participantCountRead.data, publicClient, settledEpoch]);
 
   // Invalidate queries helper
 
@@ -690,11 +705,9 @@ export default function App() {
       participantDataRead.refetch(),
       lastDrawEpochRead.refetch(),
       pendingDrawRequestIdRead.refetch(),
-      activeTotalWeightRead.refetch(),
     ]);
     queryClient.invalidateQueries();
   }, [
-    activeTotalWeightRead,
     currentEpochRead,
     epochStateRead,
     lastDrawEpochRead,
