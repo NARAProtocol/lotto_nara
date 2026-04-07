@@ -917,41 +917,40 @@ export default function App() {
         </div>
       </header>
 
-      {/* ── HERO: asymmetric — jackpot left, join CTA right ── */}
+      {/* ── HERO: jackpot billboard top, join panel below ── */}
       <section className="nb-hero" aria-label="Prize pool and entry">
 
-        {/* Jackpot — visual anchor, 10/10 weight */}
+        {/* Jackpot billboard — weight 10 HERO, dark inverted card */}
         <div className="nb-jackpot">
-          <div className="nb-jackpot-shimmer" aria-hidden="true" />
-          <div className="nb-jackpot-glow" aria-hidden="true" />
-          <p className="nb-jackpot-eyebrow">
-            <span className="nb-jackpot-dot" />
-            Live Prize Pool
-          </p>
-          <div className="nb-jackpot-amount">
-            <span className="nb-jackpot-nara">
-              {formatNara(potNara)}
+          <div className="nb-jackpot-ring" aria-hidden="true" />
+          <div className="nb-jackpot-ring nb-jackpot-ring--2" aria-hidden="true" />
+          <p className="nb-jackpot-label">Jackpot</p>
+          <div className="nb-jackpot-stack">
+            <div className="nb-jackpot-row">
+              <span className="nb-jackpot-num">{formatNara(potNara)}</span>
+              <span className="nb-jackpot-ticker">NARA</span>
+            </div>
+            <div className="nb-jackpot-sep">
+              <span className="nb-jackpot-sep-line" />
+              <span className="nb-jackpot-sep-plus">+</span>
+              <span className="nb-jackpot-sep-line" />
+            </div>
+            <div className="nb-jackpot-row nb-jackpot-row--eth">
+              <span className="nb-jackpot-num nb-jackpot-num--eth">{formatEth(potEth)}</span>
+              <span className="nb-jackpot-ticker">ETH</span>
+            </div>
+          </div>
+          <div className="nb-jackpot-foot">
+            <span className="nb-jackpot-badge">
+              <span className="nb-live-dot" />
+              Live on Base
             </span>
-            <span className="nb-jackpot-currency">NARA</span>
-          </div>
-          <div className="nb-jackpot-divider" aria-hidden="true">
-            <span className="nb-jackpot-plus-icon">+</span>
-          </div>
-          <div className="nb-jackpot-amount nb-jackpot-amount--eth">
-            <span className="nb-jackpot-eth">
-              {formatEth(potEth)}
-            </span>
-            <span className="nb-jackpot-currency">ETH</span>
-          </div>
-          <div className="nb-jackpot-meta">
-            <span className="nb-jackpot-tag">base mainnet</span>
-            <span className="nb-jackpot-tag">principal protected</span>
-            <span className="nb-jackpot-tag">chainlink vrf</span>
-            {prizePoolIsEmpty && <span className="nb-jackpot-tag nb-jackpot-tag--building">accumulating</span>}
+            <span className="nb-jackpot-badge">No-Loss</span>
+            <span className="nb-jackpot-badge">Chainlink VRF</span>
           </div>
         </div>
 
-        {/* Join CTA — dominant secondary, 9/10 weight */}
+        {/* Join CTA */}
         <div className="nb-join-panel">
           <h2 className="nb-join-title">Enter The Draw</h2>
           <p className="nb-join-sub">
