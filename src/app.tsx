@@ -864,11 +864,33 @@ export default function App() {
 
   const isBusy = txStep !== "idle";
 
+  // Preset amounts derived from pool config
+  const presetAmounts = poolConfig
+    ? [
+        minDepositAmount,
+        minDepositAmount * 2n > 0n ? minDepositAmount * 2n : null,
+        maxDepositAmount > 0n && maxDepositAmount !== minDepositAmount ? maxDepositAmount / 2n : null,
+        maxDepositAmount > 0n ? maxDepositAmount : null,
+      ].filter((v): v is bigint => v !== null && v > 0n)
+        .filter((v, i, arr) => arr.findIndex(x => x === v) === i)
+        .slice(0, 4)
+    : [];
+
   // Render
 
   return (
     <>
     <a href="#main-content" className="nb-skip-link">Skip to main content</a>
+
+    {/* Draw drama overlay — shown when Chainlink VRF is running */}
+    {drawPending && (
+      <div className="nb-draw-overlay" role="status" aria-live="polite">
+        <div className="nb-draw-overlay-orb" aria-hidden="true" />
+        <p className="nb-draw-overlay-title">Picking The Winner</p>
+        <p className="nb-draw-overlay-sub">Chainlink VRF on-chain &mdash; randomness incoming</p>
+      </div>
+    )}
+
     <main id="main-content">
     <div className="nb-shell">
 
@@ -887,199 +909,83 @@ export default function App() {
         </div>
       </header>
 
-      {/* Jackpot Hero */}
-      <section className={`nb-jackpot-hero${prizePoolIsEmpty ? " nb-jackpot-empty" : ""}`} aria-label="Prize Pool">
-        <div className="nb-jackpot-shimmer" aria-hidden="true" />
-        <p className="nb-jackpot-label">Live Prize Pool</p>
-        {prizePoolIsEmpty && <p className="nb-jackpot-open">Pool open - prize starts at zero</p>}
-        <div className="nb-jackpot-amount">
-          <span className="nb-jackpot-nara">{formatNara(potNara)}<span className="nb-jackpot-unit"> NARA</span></span>
-          <span className="nb-jackpot-divider">+</span>
-          <span className="nb-jackpot-eth">{formatEth(potEth)}<span className="nb-jackpot-unit"> ETH</span></span>
-        </div>
-        <p className="nb-jackpot-sub">
-          {prizePoolIsEmpty
-            ? "The first locked entries start building the yield prize. Your net locked principal is withdrawable after the lock period."
-            : "Lock NARA, keep your net locked principal, and one live entry wins the pooled yield."}
-        </p>
-        <div className="nb-jackpot-tags">
-          <span className="nb-jackpot-tag">live on base</span>
-          <span className="nb-jackpot-tag">net principal protected</span>
-          <span className="nb-jackpot-tag">{MIN_ACTIVE_PLAYERS} live player needed</span>
-          <span className="nb-jackpot-tag">chainlink vrf</span>
-        </div>
-      </section>
+      {/* ── HERO: asymmetric — jackpot left, join CTA right ── */}
+      <section className="nb-hero" aria-label="Prize pool and entry">
 
-      {/* Context row */}
-      <section className="nb-context-row" aria-label="Pool stats">
-        <div className={`nb-ctx-card nb-ctx-timer${drawReady ? " nb-ctx-ready" : ""}${drawPending ? " nb-ctx-pending" : ""}${drawWaitingForLiveEntry ? " nb-ctx-warm" : ""}`}>
-          <p className="nb-ctx-label">Draw Status</p>
-          {drawPending ? (
-            <>
-              <p className="nb-ctx-value nb-ctx-vrf">VRF</p>
-              <p className="nb-ctx-sub">winner being picked now</p>
-            </>
-          ) : drawWaitingForLiveEntry ? (
-            <>
-              <p className="nb-ctx-value nb-ctx-wait">Warm-up</p>
-              <p className="nb-ctx-sub">timer finished, waiting for a live entry</p>
-            </>
-          ) : drawReady ? (
-            <>
-              <p className="nb-ctx-value nb-ctx-rdy">Ready</p>
-              <p className="nb-ctx-sub">draw can run now</p>
-            </>
-          ) : (
-            <>
-              <p className="nb-ctx-value">{epochsUntilDraw > 0 ? epochsToTime(epochsUntilDraw) : "-"}</p>
-              <p className="nb-ctx-sub">until draw / epoch {nextDrawEpoch > 0 ? nextDrawEpoch : "-"}</p>
-            </>
-          )}
-        </div>
-
-        <div className="nb-ctx-card">
-          <p className="nb-ctx-label">Entries</p>
-          <p className="nb-ctx-value">{participantCount}<span className="nb-ctx-value-max"> / {maxParticipants}</span></p>
-          <div className="nb-ctx-prog-track">
-            <div className="nb-ctx-prog-fill" style={{ width: `${maxParticipants > 0 ? Math.round((participantCount / maxParticipants) * 100) : 0}%` }} />
+        {/* Jackpot — visual anchor, 10/10 weight */}
+        <div className="nb-jackpot">
+          <div className="nb-jackpot-shimmer" aria-hidden="true" />
+          <p className="nb-jackpot-eyebrow">Live Prize Pool</p>
+          <div className="nb-jackpot-amount">
+            <span className="nb-jackpot-nara">
+              {formatNara(potNara)}<span className="nb-jackpot-unit"> NARA</span>
+            </span>
+            <span className="nb-jackpot-plus">+</span>
+            <span className="nb-jackpot-eth">
+              {formatEth(potEth)}<span className="nb-jackpot-unit"> ETH</span>
+            </span>
           </div>
-          <p className="nb-ctx-sub">
-            {liveEntriesKnown
-              ? `${liveEntries} live now - ${openSpots} spot${openSpots === 1 ? "" : "s"} open`
-              : `${openSpots} spot${openSpots === 1 ? "" : "s"} open`}
+          <div className="nb-jackpot-meta">
+            <span className="nb-jackpot-tag">base mainnet</span>
+            <span className="nb-jackpot-tag">principal protected</span>
+            <span className="nb-jackpot-tag">chainlink vrf</span>
+            {prizePoolIsEmpty && <span className="nb-jackpot-tag">building now</span>}
+          </div>
+        </div>
+
+        {/* Join CTA — dominant secondary, 9/10 weight */}
+        <div className="nb-join-panel">
+          <h2 className="nb-join-title">Enter The Draw</h2>
+          <p className="nb-join-sub">
+            Lock NARA, keep your principal, one entry wins the yield.
+            {poolConfig ? ` Lock period: ${epochsToTime(Number(lockDurationEpochs))}.` : ""}
           </p>
-        </div>
-
-        <div className="nb-ctx-card">
-          <p className="nb-ctx-label">Your Odds</p>
-          {isConnected && !isWrongNetwork && isParticipant && entryIsLive ? (
-            <>
-              <p className="nb-ctx-value nb-ctx-live">{userOddsPercent.toFixed(2)}<span className="nb-ctx-value-max">%</span></p>
-              <p className="nb-ctx-sub"><span className="nb-live-dot" /> live in draw</p>
-            </>
-          ) : (
-            <>
-              <p className="nb-ctx-value">-</p>
-              <p className="nb-ctx-sub">{!isConnected ? "connect to see" : isWrongNetwork ? `switch to ${NARA_CHAIN_NAME}` : isParticipant ? "warming up" : "join to see"}</p>
-            </>
-          )}
-        </div>
-      </section>
-
-      {/* Flash banner */}
-      {hasWinnings && (
-        <div className="nb-flash winner">
-          Good news - you have a prize ready to claim: {formatNara(winningsNara)} NARA + {formatEth(winningsEth)} ETH
-        </div>
-      )}
-      {!hasWinnings && drawWaitingForLiveEntry && !drawPending && (
-        <div className="nb-flash neutral">
-          The timer is finished, but there is no live entry yet. Wait until warm-up ends before running the draw.
-        </div>
-      )}
-      {!hasWinnings && drawReady && !drawPending && (
-        <div className="nb-flash draw-ready">
-          The timer is finished. A live entry exists, so the draw can run now.
-        </div>
-      )}
-      {drawPending && (
-        <div className="nb-flash neutral">
-          A winner is being picked now. Waiting for Chainlink VRF randomness on-chain.
-        </div>
-      )}
-      {isWrongNetwork && (
-        <div className="nb-flash error">
-          Your wallet is on the wrong network. Switch to {NARA_CHAIN_NAME} before joining, claiming, running the draw, or withdrawing.
-        </div>
-      )}
-      {flash && (
-        <div className={`nb-flash ${flash.tone}`} role="alert" aria-live="polite">
-          {flash.text}
-          {flash.txHash && (
-            <a href={txUrl(flash.txHash)} target="_blank" rel="noopener noreferrer" className="nb-flash-link">
-              View tx -&gt;
-            </a>
-          )}
-          <button
-            type="button"
-            onClick={() => setFlash(null)}
-            style={{ float: "right", background: "none", border: "none", cursor: "pointer", color: "inherit", fontSize: "14px", lineHeight: 1, padding: 0 }}
-            aria-label="Dismiss"
-          >
-            x
-          </button>
-        </div>
-      )}
-
-      {/* Action zone */}
-      <div className="nb-action-zone">
-
-        {/* Deposit Panel */}
-        <div className="nb-panel nb-panel-start">
-          <div className="nb-panel-headline">
-            <div>
-              <h2 className="nb-panel-header">Join The Prize Pool</h2>
-              <p className="nb-panel-intro">
-                Choose how much NARA to lock, approve once, then join. The engine takes protocol fees; the net locked principal stays withdrawable after the lock period.
-              </p>
-            </div>
-            <span className="nb-badge not-in-draw">{openSpots} spot{openSpots === 1 ? "" : "s"} open</span>
-          </div>
-
-          {poolConfig && (
-            <div className="nb-fact-grid">
-              <div className="nb-fact-card">
-                <span className="nb-fact-label">Min join</span>
-                <strong className="nb-fact-value">{formatNara(minDepositAmount)} NARA</strong>
-              </div>
-              <div className="nb-fact-card">
-                <span className="nb-fact-label">Lock time</span>
-                <strong className="nb-fact-value">{epochsToTime(Number(lockDurationEpochs))}</strong>
-              </div>
-              <div className="nb-fact-card">
-                <span className="nb-fact-label">Draw needs</span>
-                <strong className="nb-fact-value">{minPrizeLabel} jackpot</strong>
-              </div>
-            </div>
-          )}
 
           {!isConnected ? (
-            <WalletSetupCard
-              title="Connect to get started"
-              body="Use MetaMask or another supported wallet to choose an amount and join."
-              connectLabel="Connect Wallet"
-            />
+            <div className="nb-wallet-help">
+              <p className="nb-wallet-help-title">Connect to enter</p>
+              <p className="nb-wallet-help-text">MetaMask or any supported wallet on Base.</p>
+              <WalletActionButton connectLabel="Connect Wallet" />
+            </div>
           ) : isWrongNetwork ? (
-            <WalletSetupCard
-              title={"Switch to " + NARA_CHAIN_NAME}
-              body={"Approvals and joins only work on " + NARA_CHAIN_NAME + "."}
-            />
+            <div className="nb-wallet-help">
+              <p className="nb-wallet-help-title">Switch to {NARA_CHAIN_NAME}</p>
+              <p className="nb-wallet-help-text">Approvals and joins only work on Base.</p>
+              <WalletActionButton />
+            </div>
           ) : isParticipant ? (
-            <div className="nb-inner-card">
-              <span className="nb-badge warming">Already Joined</span>
-              <p className="nb-info-text" style={{ margin: "10px 0 0" }}>
-                Your entry is already in the pool. The card on the right shows when it goes live and when you can withdraw.
-              </p>
+            <div className="nb-already-joined">
+              <span className="nb-badge warming">Already In</span>
+              <p className="nb-info-text">Your entry is in the pool. Check status below.</p>
             </div>
           ) : (
             <>
-              {txStep === "approving" && (
-                <div className="nb-step-indicator">
-                  <span className="nb-step-dot" />
-                  Step 1 of 2: Approve NARA
+              {/* Quick-select presets */}
+              {presetAmounts.length > 0 && (
+                <div className="nb-presets" role="group" aria-label="Quick amounts">
+                  {presetAmounts.map((amt) => (
+                    <button
+                      key={String(amt)}
+                      type="button"
+                      className={`nb-preset-btn${amountWei === amt ? " active" : ""}`}
+                      onClick={() => setDepositAmount(formatNara(amt))}
+                      disabled={isBusy}
+                    >
+                      {formatNara(amt)}
+                    </button>
+                  ))}
                 </div>
               )}
-              {txStep === "depositing" && (
+
+              {(txStep === "approving" || txStep === "depositing") && (
                 <div className="nb-step-indicator">
                   <span className="nb-step-dot" />
-                  Step 2 of 2: Join the Pool
+                  {txStep === "approving" ? "Step 1 of 2 — Approve NARA" : "Step 2 of 2 — Joining pool"}
                 </div>
               )}
 
               <div className="nb-input-wrap">
-                <label htmlFor="deposit-amount" className="nb-input-label">
-                  Choose amount (NARA)
-                </label>
+                <label htmlFor="deposit-amount" className="nb-input-label">Amount (NARA)</label>
                 <input
                   id="deposit-amount"
                   type="text"
@@ -1091,72 +997,44 @@ export default function App() {
                   placeholder={minDepositAmount > 0n ? formatNara(minDepositAmount) : "0"}
                   disabled={isBusy}
                 />
-                {minDepositAmount > 0n && (
-                  <p className="nb-input-helper">
-                    Join range: {formatNara(minDepositAmount)} to {formatNara(maxDepositAmount)} NARA.
-                  </p>
-                )}
-                <p className="nb-input-helper">If you are unsure, starting with the minimum is fine.</p>
                 {amountError && <p className="nb-input-error">{amountError}</p>}
               </div>
 
+              {/* Odds preview — only shown when amount is entered */}
               {amountWei > 0n && (
-                <div className="nb-preview-card">
-                  <p className="nb-panel-header">Quick Check</p>
-                  <div className="nb-data-row" style={{ borderTop: "none", paddingTop: 0 }}>
-                    <span className="nb-data-label">Estimated odds</span>
-                    <span className="nb-data-value">{previewWeight > 0n ? previewOdds.toFixed(2) + "%" : "Loading..."}</span>
+                <div className="nb-odds-strip">
+                  <span className="nb-odds-label">Your odds if you join now</span>
+                  <span className="nb-odds-value">
+                    {previewWeight > 0n ? previewOdds.toFixed(2) + "%" : "..."}
+                  </span>
+                </div>
+              )}
+
+              {/* Fee summary — collapsed, not over-explained */}
+              {amountWei > 0n && (
+                <div className="nb-fee-block">
+                  <div className="nb-fee-row">
+                    <span>Net locked</span>
+                    <span className="nb-fee-val">{formatNara(netLockAmount)} NARA</span>
                   </div>
-                  <div className="nb-data-row">
-                    <span className="nb-data-label">NARA lock fee</span>
-                    <span className="nb-data-value">{formatNara(lockFeeNara)} NARA ({formatBps(lockFeeBps)})</span>
+                  <div className="nb-fee-row">
+                    <span>Join fee</span>
+                    <span className="nb-fee-val">{formatEth(lockFeeWei)} ETH + gas</span>
                   </div>
-                  <div className="nb-data-row">
-                    <span className="nb-data-label">Net principal locked</span>
-                    <span className="nb-data-value">{formatNara(netLockAmount)} NARA</span>
-                  </div>
-                  <div className="nb-data-row">
-                    <span className="nb-data-label">Join ETH fee</span>
-                    <span className="nb-data-value">{formatEth(lockFeeWei)} ETH + gas</span>
-                  </div>
-                  <div className="nb-data-row">
-                    <span className="nb-data-label">Withdraw ETH fee later</span>
-                    <span className="nb-data-value">{formatEth(unlockFeeWei)} ETH + gas</span>
-                  </div>
-                  <div className='nb-data-row'>
-                    <span className='nb-data-label'>ETH yield fee</span>
-                    <span className='nb-data-value'>
-                      {claimFeeLabel === 'loading' ? 'Loading...' : `${claimFeeLabel} before ETH reaches the prize pool`}
-                    </span>
-                  </div>
-                  <div className="nb-data-row">
-                    <span className="nb-data-label">Approval recipient</span>
-                    <span className="nb-data-value">
-                      <a href={`https://basescan.org/address/${NARA_LOTTO_POOL_ADDRESS}`} target="_blank" rel="noopener noreferrer" className="nb-view-link">
-                        {shortAddress(NARA_LOTTO_POOL_ADDRESS)}
-                      </a>
-                    </span>
-                  </div>
-                  <div className="nb-data-row">
-                    <span className="nb-data-label">Starts counting</span>
-                    <span className="nb-data-value">After warm-up</span>
-                  </div>
-                  <div className="nb-data-row">
-                    <span className="nb-data-label">Can withdraw from</span>
-                    <span className="nb-data-value">{epochsToDate(currentEpoch, Number(lockDurationEpochs))}</span>
+                  <div className="nb-fee-row">
+                    <span>Unlocks</span>
+                    <span className="nb-fee-val">{epochsToDate(currentEpoch, Number(lockDurationEpochs))}</span>
                   </div>
                 </div>
               )}
 
               {engineSyncRequired && (
                 <div className="nb-soft-note">
-                  The pool timer is {backlog} epoch{backlog === 1 ? "" : "s"} behind live time. V2 catches up inside Join, Withdraw, and Draw so there is no separate sync step.
+                  Engine {backlog} epoch{backlog === 1 ? "" : "s"} behind — V2 auto-syncs inside join.
                 </div>
               )}
 
-              <p className="nb-wallet-action-note">
-                You will see 2 wallet popups: approve, then join. The join transaction syncs the engine automatically if needed.
-              </p>
+              <p className="nb-wallet-action-note">2 wallet popups: approve, then join.</p>
 
               <div className="nb-button-row">
                 <button
@@ -1168,12 +1046,8 @@ export default function App() {
                   aria-busy={txStep === "approving"}
                 >
                   {txStep === "approving" ? (
-                    <>
-                      <span className="nb-spinner" aria-hidden="true" />
-                      <span className="nb-sr-only">Approving...</span>
-                      Approving...
-                    </>
-                  ) : isApproved ? "Approved" : amountWei > 0n ? `Approve ${formatNara(amountWei)} NARA` : "Approve NARA"}
+                    <><span className="nb-spinner" aria-hidden="true" /><span className="nb-sr-only">Approving...</span>Approving...</>
+                  ) : isApproved ? "Approved" : "Approve"}
                 </button>
 
                 <button
@@ -1185,75 +1059,141 @@ export default function App() {
                   aria-busy={txStep === "depositing"}
                 >
                   {txStep === "depositing" ? (
-                    <>
-                      <span className="nb-spinner" aria-hidden="true" />
-                      <span className="nb-sr-only">Joining...</span>
-                      Joining...
-                    </>
+                    <><span className="nb-spinner" aria-hidden="true" /><span className="nb-sr-only">Joining...</span>Joining...</>
                   ) : "Join Pool"}
                 </button>
               </div>
             </>
           )}
-
-          <details className="nb-rule-disclosure">
-            <summary className="nb-rule-summary">How it works</summary>
-            <div className="nb-rule-grid">
-              <div className="nb-rule-item">
-                <span className="nb-rule-num">1</span>
-                <div>
-                  <p className="nb-rule-title">Choose an amount</p>
-                  <p className="nb-rule-copy">{poolConfig ? "Join with " + formatNara(minDepositAmount) + " to " + formatNara(maxDepositAmount) + " NARA. Starting small is okay." : "Join amount is loading..."}</p>
-                </div>
-              </div>
-              <div className="nb-rule-item">
-                <span className="nb-rule-num">2</span>
-                <div>
-                  <p className="nb-rule-title">Warm-up first</p>
-                  <p className="nb-rule-copy">Your entry does not count instantly. It goes live after a short warm-up.</p>
-                </div>
-              </div>
-              <div className="nb-rule-item">
-                <span className="nb-rule-num">3</span>
-                <div>
-                  <p className="nb-rule-title">Draw runs on the timer</p>
-                  <p className="nb-rule-copy">When the timer is ready and at least one entry is live, anyone can run the draw. V2 moves yield into the jackpot first and skips VRF if the jackpot is still too small.</p>
-                </div>
-              </div>
-              <div className="nb-rule-item">
-                <span className="nb-rule-num">4</span>
-                <div>
-                  <p className="nb-rule-title">Withdraw later</p>
-                  <p className="nb-rule-copy">Your net principal stays locked for {epochsToTime(Number(lockDurationEpochs))}, then Withdraw syncs, moves your yield into the jackpot, and returns your NARA.</p>
-                </div>
-              </div>
-            </div>
-          </details>
         </div>
-        {/* My Position */}
-        <div className="nb-panel nb-panel-entry">
+      </section>
+
+      {/* ── Stats strip — 3 cards, draw timer dominant ── */}
+      <section className="nb-stats-strip" aria-label="Pool stats">
+        <div className={`nb-stat-card${drawReady ? " is-ready" : ""}${drawPending ? " is-pending" : ""}`}>
+          <p className="nb-stat-label">Draw</p>
+          {drawPending ? (
+            <><p className="nb-stat-value is-vrf">VRF</p><p className="nb-stat-sub">winner being picked</p></>
+          ) : drawWaitingForLiveEntry ? (
+            <><p className="nb-stat-value is-wait">Warm-up</p><p className="nb-stat-sub">timer done, waiting for live entry</p></>
+          ) : drawReady ? (
+            <><p className="nb-stat-value is-gold">Ready</p><p className="nb-stat-sub">draw can run now</p></>
+          ) : (
+            <>
+              <p className="nb-stat-value">{epochsUntilDraw > 0 ? epochsToTime(epochsUntilDraw) : "—"}</p>
+              <p className="nb-stat-sub">epoch {nextDrawEpoch > 0 ? nextDrawEpoch : "—"}</p>
+            </>
+          )}
+        </div>
+
+        <div className="nb-stat-card">
+          <p className="nb-stat-label">Entries</p>
+          <p className="nb-stat-value">{participantCount}<span className="nb-stat-value-max"> / {maxParticipants}</span></p>
+          <div className="nb-stat-prog-track">
+            <div className="nb-stat-prog-fill" style={{ width: `${maxParticipants > 0 ? Math.round((participantCount / maxParticipants) * 100) : 0}%` }} />
+          </div>
+          <p className="nb-stat-sub">
+            {liveEntriesKnown ? `${liveEntries} live · ${openSpots} open` : `${openSpots} open`}
+          </p>
+        </div>
+
+        <div className="nb-stat-card">
+          <p className="nb-stat-label">Your Odds</p>
+          {isConnected && !isWrongNetwork && isParticipant && entryIsLive ? (
+            <><p className="nb-stat-value is-live">{userOddsPercent.toFixed(2)}<span className="nb-stat-value-max">%</span></p><p className="nb-stat-sub"><span className="nb-live-dot" /> live</p></>
+          ) : (
+            <><p className="nb-stat-value">—</p><p className="nb-stat-sub">{!isConnected ? "connect" : isWrongNetwork ? "switch network" : isParticipant ? "warming up" : "join to see"}</p></>
+          )}
+        </div>
+      </section>
+
+      {/* Flash banners */}
+      {hasWinnings && (
+        <div className="nb-flash winner">
+          <span className="nb-flash-text">Prize ready — {formatNara(winningsNara)} NARA + {formatEth(winningsEth)} ETH</span>
+        </div>
+      )}
+      {!hasWinnings && drawReady && !drawPending && (
+        <div className="nb-flash draw-ready">
+          <span className="nb-flash-text">Timer finished · live entry exists · draw can run now</span>
+        </div>
+      )}
+      {!hasWinnings && drawWaitingForLiveEntry && !drawPending && (
+        <div className="nb-flash neutral">
+          <span className="nb-flash-text">Timer done but no live entry yet. Wait for warm-up to finish.</span>
+        </div>
+      )}
+      {isWrongNetwork && (
+        <div className="nb-flash error">
+          <span className="nb-flash-text">Switch to {NARA_CHAIN_NAME} to join, claim, or withdraw.</span>
+        </div>
+      )}
+      {flash && (
+        <div className={`nb-flash ${flash.tone}`} role="alert" aria-live="polite">
+          <span className="nb-flash-text">
+            {flash.text}
+            {flash.txHash && (
+              <a href={txUrl(flash.txHash)} target="_blank" rel="noopener noreferrer" className="nb-flash-link"> View tx</a>
+            )}
+          </span>
+          <button type="button" className="nb-flash-close" onClick={() => setFlash(null)} aria-label="Dismiss">×</button>
+        </div>
+      )}
+
+      {/* ── Action zone: how it works + your entry ── */}
+      <div className="nb-action-zone">
+
+        {/* How it works — 4 clean tiles */}
+        <div className="nb-panel">
+          <h2 className="nb-panel-header">How It Works</h2>
+          <div className="nb-how-strip">
+            <div className="nb-how-item">
+              <span className="nb-how-num">1</span>
+              <p className="nb-how-title">Lock NARA</p>
+              <p className="nb-how-copy">{poolConfig ? `${formatNara(minDepositAmount)}–${formatNara(maxDepositAmount)} NARA. Principal stays yours.` : "Loading..."}</p>
+            </div>
+            <div className="nb-how-item">
+              <span className="nb-how-num">2</span>
+              <p className="nb-how-title">Warm-up</p>
+              <p className="nb-how-copy">Entry goes live after a short delay. Then it counts in every draw.</p>
+            </div>
+            <div className="nb-how-item">
+              <span className="nb-how-num">3</span>
+              <p className="nb-how-title">Draw fires</p>
+              <p className="nb-how-copy">Timer hits, yield moves to jackpot, Chainlink VRF picks one winner.</p>
+            </div>
+            <div className="nb-how-item">
+              <span className="nb-how-num">4</span>
+              <p className="nb-how-title">Withdraw</p>
+              <p className="nb-how-copy">After {poolConfig ? epochsToTime(Number(lockDurationEpochs)) : "the lock period"}, withdraw your net locked NARA.</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Your entry — right panel */}
+        <div className="nb-entry-panel">
           <h2 className="nb-panel-header">Your Entry</h2>
 
           {!isConnected ? (
-            <WalletSetupCard
-              title="Connect to see your entry"
-              body="Use the same wallet you joined with to see your status, odds, and unlock time."
-              connectLabel="Connect Wallet"
-            />
+            <div className="nb-wallet-help">
+              <p className="nb-wallet-help-title">Connect to see your entry</p>
+              <p className="nb-wallet-help-text">Same wallet you joined with.</p>
+              <WalletActionButton connectLabel="Connect Wallet" />
+            </div>
           ) : isWrongNetwork ? (
-            <WalletSetupCard
-              title={"Switch to " + NARA_CHAIN_NAME}
-              body={"Reconnect on " + NARA_CHAIN_NAME + " to see your entry and withdrawal time."}
-            />
+            <div className="nb-wallet-help">
+              <p className="nb-wallet-help-title">Switch to {NARA_CHAIN_NAME}</p>
+              <p className="nb-wallet-help-text">Reconnect on Base to see your entry.</p>
+              <WalletActionButton />
+            </div>
           ) : (
             <>
               {hasWinnings && (
                 <div className="nb-winner-callout">
-                  <p className="nb-winner-callout-title">Prize Ready To Claim</p>
+                  <p className="nb-winner-callout-title">Prize Ready</p>
                   <p className="nb-winner-callout-amounts">
                     {formatNara(winningsNara)} NARA + {formatEth(winningsEth)} ETH
                   </p>
-                  <p className='nb-input-helper'>ETH yield reaches the prize pool after the {claimFeeLabel} engine fee; claiming this prize pays wallet gas only.</p>
                   <button
                     type="button"
                     className="nb-btn-gold"
@@ -1262,11 +1202,7 @@ export default function App() {
                     aria-busy={txStep === "claiming"}
                   >
                     {txStep === "claiming" ? (
-                      <>
-                        <span className="nb-spinner" aria-hidden="true" />
-                        <span className="nb-sr-only">Claiming...</span>
-                        Claiming...
-                      </>
+                      <><span className="nb-spinner" aria-hidden="true" /><span className="nb-sr-only">Claiming...</span>Claiming...</>
                     ) : "Claim Prize"}
                   </button>
                 </div>
@@ -1275,46 +1211,38 @@ export default function App() {
               {isParticipant ? (
                 <>
                   {drawWaitingForLiveEntry && !entryIsLive && (
-                    <div className="nb-soft-note">
-                      The timer is already finished, but your entry is still warming up. Wait until it goes live before running the first draw.
-                    </div>
+                    <div className="nb-soft-note">Timer finished but your entry is still warming up.</div>
                   )}
                   <div className="nb-entry-topline">
                     <span className={"nb-badge " + (entryIsLive ? "in-draw" : "warming")}>
-                      {entryIsLive ? "Live In Draw" : "Warming Up"}
+                      {entryIsLive ? "Live" : "Warming Up"}
                     </span>
                     <p className="nb-entry-caption">
-                      {entryIsLive
-                        ? "Your entry is active now and counts in the next draw."
-                        : "Your entry starts counting in " + epochsToTime(entryStartsInEpochs) + "."}
+                      {entryIsLive ? "Active in the next draw." : `Live in ${epochsToTime(entryStartsInEpochs)}.`}
                     </p>
                   </div>
 
                   <div className="nb-status-grid">
                     <div className="nb-status-card">
-                      <span className="nb-status-label">Your odds</span>
-                      <strong className="nb-status-value">{entryIsLive ? userOddsPercent.toFixed(2) + "%" : "After warm-up"}</strong>
-                    </div>
-                    <div className='nb-status-card'>
-                      <span className='nb-status-label'>Net locked</span>
-                      <strong className='nb-status-value'>{participantNetAmount > 0n ? formatNara(participantNetAmount) + ' NARA' : 'Loading...'}</strong>
+                      <span className="nb-status-label">Odds</span>
+                      <strong className="nb-status-value">{entryIsLive ? userOddsPercent.toFixed(2) + "%" : "—"}</strong>
                     </div>
                     <div className="nb-status-card">
-                      <span className="nb-status-label">Starts counting</span>
-                      <strong className="nb-status-value">{entryIsLive ? "Live now" : epochsToTime(entryStartsInEpochs)}</strong>
+                      <span className="nb-status-label">Net locked</span>
+                      <strong className="nb-status-value">{participantNetAmount > 0n ? formatNara(participantNetAmount) + " N" : "..."}</strong>
                     </div>
                     <div className="nb-status-card">
-                      <span className="nb-status-label">Withdraw opens</span>
+                      <span className="nb-status-label">Unlock</span>
                       <strong className="nb-status-value">{withdrawActionReady ? "Now" : epochsToDate(currentEpoch, unlocksInEpochs)}</strong>
                     </div>
                     <div className="nb-status-card">
                       <span className="nb-status-label">Time left</span>
-                      <strong className="nb-status-value">{withdrawActionReady ? "Ready now" : epochsToTime(unlocksInEpochs)}</strong>
+                      <strong className="nb-status-value">{withdrawActionReady ? "Ready" : epochsToTime(unlocksInEpochs)}</strong>
                     </div>
                   </div>
 
-                  <div style={{ margin: "14px 0 4px" }}>
-                    <p className="nb-input-label" style={{ marginBottom: "4px" }}>Withdrawal progress</p>
+                  <div>
+                    <p className="nb-prog-label">Withdrawal progress</p>
                     <div
                       className="nb-prog-track"
                       role="progressbar"
@@ -1323,52 +1251,39 @@ export default function App() {
                       aria-valuemax={100}
                       aria-label="Lock duration progress"
                     >
-                      <div className="nb-prog-fill" style={{ width: String(lockProgressPct) + "%" }} />
+                      <div className="nb-prog-fill" style={{ width: lockProgressPct + "%" }} />
                     </div>
-                    <p className="nb-input-hint">{withdrawActionReady ? "Your net principal can be withdrawn now." : "Unlocks on " + epochsToDate(currentEpoch, unlocksInEpochs) + "."}</p>
+                    <p className="nb-prog-hint">
+                      {withdrawActionReady ? "Unlocked — ready to withdraw." : `Unlocks ${epochsToDate(currentEpoch, unlocksInEpochs)}.`}
+                    </p>
                   </div>
 
-                  {withdrawActionReady && engineSyncRequired && (
-                    <div className="nb-soft-note">
-                      The unlock time has passed and the engine is {backlog} epoch{backlog === 1 ? "" : "s"} behind live time. V2 syncs and harvests your clone inside the withdrawal transaction.
-                    </div>
-                  )}
-                  {canWithdraw && (
-                    <div className="nb-soft-note">
-                      Withdrawal sends the {formatEth(unlockFeeWei)} ETH unlock fee plus gas, moves your clone yield into the jackpot, then returns your net locked NARA.
-                    </div>
+                  {(withdrawActionReady && engineSyncRequired) && (
+                    <div className="nb-soft-note">Engine {backlog}e behind — V2 syncs inside withdraw tx.</div>
                   )}
                   {hasUnlockEthShortfall && (
-                    <p className="nb-input-error">You need at least {formatEth(unlockFeeWei)} ETH on Base for the unlock fee, plus gas.</p>
+                    <p className="nb-input-error">Need {formatEth(unlockFeeWei)} ETH for unlock fee + gas.</p>
                   )}
 
                   <button
                     type="button"
                     className="nb-btn-secondary"
+                    style={{ marginTop: "14px" }}
                     onClick={handleWithdraw}
                     disabled={isBusy || !withdrawActionReady || hasUnlockEthShortfall}
-                    title={withdrawActionReady ? "Withdraw net locked principal" : "Unlocks at epoch " + unlockEpoch + " (" + epochsToDate(currentEpoch, Math.max(0, unlockEpoch - currentEpoch)) + ")"}
                     aria-disabled={!withdrawActionReady || isBusy || hasUnlockEthShortfall}
                     aria-busy={txStep === "withdrawing"}
                   >
                     {txStep === "withdrawing" ? (
-                      <>
-                        <span className="nb-spinner" aria-hidden="true" />
-                        <span className="nb-sr-only">Withdrawing...</span>
-                        Withdrawing...
-                      </>
-                    ) : withdrawActionReady
-                        ? "Withdraw NARA"
-                        : "Available at epoch " + unlockEpoch}
+                      <><span className="nb-spinner" aria-hidden="true" /><span className="nb-sr-only">Withdrawing...</span>Withdrawing...</>
+                    ) : withdrawActionReady ? "Withdraw NARA" : `Epoch ${unlockEpoch}`}
                   </button>
                 </>
               ) : (
                 <div className="nb-empty-entry">
-                  <span className="nb-badge not-in-draw">No Entry Yet</span>
-                  <p className="nb-empty-entry-title">Nothing to track yet</p>
-                  <p className="nb-empty-entry-text">
-                    Join from the left. After the warm-up, your odds and withdrawal time will show here.
-                  </p>
+                  <span className="nb-badge not-in-draw">No Entry</span>
+                  <p className="nb-empty-entry-title">Nothing here yet</p>
+                  <p className="nb-empty-entry-text">Join above. Your odds and unlock time appear after warm-up.</p>
                 </div>
               )}
             </>
@@ -1376,128 +1291,67 @@ export default function App() {
         </div>
       </div>
 
-      {/* Draw Section */}
+      {/* ── Draw section ── */}
       <div className="nb-draw-section">
         <h2 className="nb-panel-header">Prize Draw</h2>
-
-        <div className="nb-draw-trigger-row">
+        <div className="nb-draw-inner">
           <div>
-            {drawPending ? (
-              <div className="nb-draw-status-text">
-                <span className="nb-spinner" />
-                Chainlink VRF is picking the winner...
-              </div>
-            ) : drawWaitingForLiveEntry ? (
-              <div>
-                <p className="nb-countdown">Warm-up first</p>
-                <p className="nb-countdown-label">timer finished for epoch {nextDrawEpoch}, but there is no live entry yet</p>
-              </div>
+            {drawWaitingForLiveEntry ? (
+              <><p className="nb-countdown">Warm-up</p><p className="nb-countdown-label">timer done · waiting for live entry</p></>
             ) : drawReady ? (
-              <div className="nb-draw-status-text">
-                Timer finished for epoch {nextDrawEpoch}. A live entry exists, so the draw can run now.
-              </div>
+              <><p className="nb-countdown">Ready</p><p className="nb-countdown-label">epoch {nextDrawEpoch} · draw can run now</p></>
             ) : (
-              <div>
-                <p className="nb-countdown">{epochsUntilDraw > 0 ? epochsToTime(epochsUntilDraw) : "-"}</p>
-                <p className="nb-countdown-label">until the draw can run / epoch {nextDrawEpoch}</p>
-              </div>
+              <><p className="nb-countdown">{epochsUntilDraw > 0 ? epochsToTime(epochsUntilDraw) : "—"}</p><p className="nb-countdown-label">until draw · epoch {nextDrawEpoch > 0 ? nextDrawEpoch : "—"}</p></>
             )}
           </div>
 
-          <p className="nb-draw-explainer">
-            V2 has no separate yield button. Run Draw syncs the engine, moves available clone yield into the jackpot, and only starts Chainlink VRF if the jackpot meets the minimum.
-            {engineSyncRequired ? ` The engine is ${backlog} epoch${backlog === 1 ? "" : "s"} behind; the draw transaction catches up automatically within the V2 limit.` : ""}
-          </p>
-
-          {!isConnected || isWrongNetwork ? (
-            <div className="nb-draw-wallet-note">
-              <p className="nb-wallet-help-text">
-                {!isConnected
-                  ? "Connect a wallet to run the draw."
-                  : `Switch to ${NARA_CHAIN_NAME} to run the draw.`}
-              </p>
-              <WalletActionButton className="nb-btn-secondary" connectLabel="Connect Wallet" />
-            </div>
-          ) : (
-            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-              {drawWaitingForLiveEntry && !drawPending && (
-                <button
-                  type="button"
-                  className="nb-btn-gold"
-                  style={{ width: "auto", minWidth: "220px", marginBottom: 0 }}
-                  disabled
-                  aria-disabled="true"
-                  title="Wait until at least one entry is live before running the draw"
-                >
-                  Waiting For Live Entry
-                </button>
-              )}
-              {drawReady && !drawPending && (
-                <button
-                  type="button"
-                  className="nb-btn-gold"
-                  style={{ width: "auto", minWidth: "180px", marginBottom: 0 }}
-                  onClick={handleDrawWinner}
-                  disabled={isBusy}
-                  aria-busy={txStep === "drawing"}
-                >
-                  {txStep === "drawing" ? (
-                    <>
-                      <span className="nb-spinner" aria-hidden="true" />
-                      <span className="nb-sr-only">Triggering...</span>
-                      Triggering...
-                    </>
-                  ) : "Run Draw"}
-                </button>
-              )}
-            </div>
-          )}
+          <div className="nb-draw-actions">
+            {!isConnected || isWrongNetwork ? (
+              <div className="nb-draw-wallet-note">
+                <WalletActionButton className="nb-btn-secondary" connectLabel={!isConnected ? "Connect Wallet" : `Switch to ${NARA_CHAIN_NAME}`} />
+              </div>
+            ) : drawWaitingForLiveEntry && !drawPending ? (
+              <button type="button" className="nb-btn-gold" disabled aria-disabled="true">Waiting for live entry</button>
+            ) : drawReady && !drawPending ? (
+              <button
+                type="button"
+                className="nb-btn-gold"
+                onClick={handleDrawWinner}
+                disabled={isBusy}
+                aria-busy={txStep === "drawing"}
+              >
+                {txStep === "drawing" ? (
+                  <><span className="nb-spinner" aria-hidden="true" /><span className="nb-sr-only">Running draw...</span>Running...</>
+                ) : "Run Draw"}
+              </button>
+            ) : null}
+          </div>
         </div>
 
-        {/* Draw history */}
-        <h2 className="nb-panel-header" style={{ marginBottom: "12px" }}>Recent Winners</h2>
+        <h3 className="nb-panel-header" style={{ marginBottom: "12px" }}>Recent Winners</h3>
         {drawHistory.length === 0 ? (
-          <div className="nb-placeholder" style={{ padding: "24px 20px" }}>
-            No completed draws yet. The first winner will appear here.
-          </div>
+          <div className="nb-placeholder">No draws yet. First winner shows here.</div>
         ) : (
           <div className="nb-table-wrap">
             <table className="nb-table" aria-label="Draw history">
               <thead>
-                <tr>
-                  <th>Winner</th>
-                  <th>NARA Prize</th>
-                  <th>ETH Prize</th>
-                  <th>Tx</th>
-                </tr>
+                <tr><th>Winner</th><th>NARA</th><th>ETH</th><th>Tx</th></tr>
               </thead>
               <tbody>
                 {drawHistory.map((rec, i) => (
                   <tr key={i}>
                     <td>
                       {shortAddress(rec.winner)}
-                      <button
-                        type="button"
-                        className="nb-copy-btn"
-                        onClick={() => handleCopy(rec.winner)}
-                        aria-label={copiedAddr === rec.winner ? "Copied!" : "Copy address"}
-                      >
-                        {copiedAddr === rec.winner ? "Copied" : "Copy"}
+                      <button type="button" className="nb-copy-btn" onClick={() => handleCopy(rec.winner)} aria-label={copiedAddr === rec.winner ? "Copied!" : "Copy address"}>
+                        {copiedAddr === rec.winner ? "✓" : "⧉"}
                       </button>
                     </td>
-                    <td>{formatNara(rec.potNara)} NARA</td>
-                    <td>{formatEth(rec.potEth)} ETH</td>
+                    <td>{formatNara(rec.potNara)}</td>
+                    <td>{formatEth(rec.potEth)}</td>
                     <td>
                       {rec.txHash ? (
-                        <a
-                          href={`https://basescan.org/tx/${rec.txHash}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="nb-view-link"
-                        >
-                          View -&gt;
-                        </a>
-                      ) : "-"}
+                        <a href={`https://basescan.org/tx/${rec.txHash}`} target="_blank" rel="noopener noreferrer" className="nb-view-link">View →</a>
+                      ) : "—"}
                     </td>
                   </tr>
                 ))}
@@ -1509,32 +1363,11 @@ export default function App() {
 
       {/* Trust bar */}
       <div className="nb-trust-bar">
-        <a
-          href={`https://basescan.org/address/${NARA_LOTTO_POOL_ADDRESS}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="nb-trust-pill"
-        >
-          Prize Pool Contract
-        </a>
-        <a
-          href={`https://basescan.org/address/${NARA_TOKEN_ADDRESS}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="nb-trust-pill"
-        >
-          NARA Token
-        </a>
+        <a href={`https://basescan.org/address/${NARA_LOTTO_POOL_ADDRESS}`} target="_blank" rel="noopener noreferrer" className="nb-trust-pill">Prize Pool Contract</a>
+        <a href={`https://basescan.org/address/${NARA_TOKEN_ADDRESS}`} target="_blank" rel="noopener noreferrer" className="nb-trust-pill">NARA Token</a>
         <span className="nb-trust-pill">Chainlink VRF</span>
         <span className="nb-trust-pill">Net Principal Protected</span>
-        <a
-          href="https://github.com/NARAProtocol/lotto_nara"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="nb-trust-pill"
-        >
-          Source Code
-        </a>
+        <a href="https://github.com/NARAProtocol/lotto_nara" target="_blank" rel="noopener noreferrer" className="nb-trust-pill">Source Code</a>
       </div>
 
     </div>
