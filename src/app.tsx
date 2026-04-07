@@ -411,7 +411,8 @@ export default function App() {
   const lockDurationEpochs = poolConfig ? BigInt(poolConfig.lockDurationEpochs ?? 0n) : 0n;
 
   const parsedDepositAmount = (() => {
-    const normalized = depositAmount.trim().replace(",", ".");
+    const raw = depositAmount.trim().replace(/,(\d{3})/g, "$1");
+    const normalized = raw.replace(",", ".");
     if (!normalized) return { amountWei: 0n, invalid: false };
     try { return { amountWei: parseEther(normalized), invalid: false }; } catch { return { amountWei: 0n, invalid: true }; }
   })();
@@ -553,9 +554,11 @@ export default function App() {
 
   const fetchDrawHistory = useCallback(async () => {
     if (!publicClient) return;
+    // Skip log fetching when no draws have happened — avoids 400s from RPC
+    if (lastDrawEpoch === 0) return;
     try {
       const currentBlock = await publicClient.getBlockNumber();
-      const LOG_RANGE = 500n;
+      const LOG_RANGE = 200n;
       const fromBlock = currentBlock > LOG_RANGE ? currentBlock - LOG_RANGE : 0n;
       const logs = await publicClient.getLogs({
         address: NARA_LOTTO_POOL_ADDRESS,
@@ -589,7 +592,7 @@ export default function App() {
     } catch {
       // silently fail - no history to show
     }
-  }, [publicClient]);
+  }, [publicClient, lastDrawEpoch]);
 
   useEffect(() => {
     void fetchDrawHistory();
@@ -985,7 +988,7 @@ export default function App() {
                       key={String(amt)}
                       type="button"
                       className={`nb-preset-btn${amountWei === amt ? " active" : ""}`}
-                      onClick={() => setDepositAmount(formatNara(amt))}
+                      onClick={() => setDepositAmount(formatEther(amt))}
                       disabled={isBusy}
                     >
                       {formatNara(amt)}
