@@ -48,12 +48,21 @@ function shortAddress(addr: string): string {
   return addr.slice(0, 6) + "..." + addr.slice(-4);
 }
 
+function formatAssetAmount(wei: bigint, standardDigits: number, smallDigits: number): string {
+  if (wei === 0n) return "0";
+  const value = Number(formatEther(wei));
+  if (value > 0 && value < 0.01) {
+    return value.toLocaleString(undefined, { maximumFractionDigits: smallDigits });
+  }
+  return value.toLocaleString(undefined, { maximumFractionDigits: standardDigits });
+}
+
 function formatNara(wei: bigint): string {
-  return parseFloat(formatEther(wei)).toLocaleString(undefined, { maximumFractionDigits: 2 });
+  return formatAssetAmount(wei, 2, 6);
 }
 
 function formatEth(wei: bigint): string {
-  return parseFloat(formatEther(wei)).toFixed(4);
+  return formatAssetAmount(wei, 4, 8);
 }
 
 function formatBps(bps: bigint): string {
@@ -888,6 +897,8 @@ export default function App() {
 
   const handleHarvest = async () => {
     if (!ensureTransactionReady("harvest yield")) return;
+    const client = publicClient;
+    if (!client) return;
     if (!ensureEngineSynced("move yield")) return;
     if (participantCountBigInt === 0n) {
       setFlash({ tone: "error", text: "There are no active entries to harvest yet." });
@@ -903,13 +914,27 @@ export default function App() {
         args: [activeHarvestCursor, HARVEST_BATCH_SIZE],
       });
       await waitForConfirmation(hash, "Yield harvest");
+      const [nextPotNara, nextPotEth] = await Promise.all([
+        client.readContract({
+          address: NARA_LOTTO_POOL_ADDRESS,
+          abi: lottoPoolAbi,
+          functionName: "potNara",
+        }),
+        client.readContract({
+          address: NARA_LOTTO_POOL_ADDRESS,
+          abi: lottoPoolAbi,
+          functionName: "potEth",
+        }),
+      ]);
+      const addedNara = nextPotNara > potNara ? nextPotNara - potNara : 0n;
+      const addedEth = nextPotEth > potEth ? nextPotEth - potEth : 0n;
       const nextCursor = harvestBatchEnd >= participantCountBigInt ? 0n : harvestBatchEnd;
       setHarvestCursor(nextCursor);
       setFlash({
         tone: "success",
-        text: nextCursor === 0n
-          ? "Yield harvest batch confirmed. All current entry batches have been covered."
-          : `Yield harvest batch confirmed. Next click resumes at entry ${Number(nextCursor) + 1}.`,
+        text: addedNara === 0n && addedEth === 0n
+          ? `Harvest confirmed, but there was no new claimable yield in this batch. Current pool: ${formatNara(nextPotNara)} NARA + ${formatEth(nextPotEth)} ETH.`
+          : `Harvest confirmed. Added ${formatNara(addedNara)} NARA + ${formatEth(addedEth)} ETH. ${nextCursor === 0n ? "All current entry batches have been covered." : `Next click resumes at entry ${Number(nextCursor) + 1}.`}`,
         txHash: hash,
       });
       invalidateLotto();
