@@ -40,7 +40,7 @@ type DrawRecord = {
 };
 
 const MIN_ACTIVE_PLAYERS = 1;
-const HARVEST_BATCH_SIZE = 50n;
+const DRAW_SKIPPED_PRIZE_TOPIC = "0xe6dcf7e022617b5021f6fccd776b41ef2507d9d79f822160f704c9f7b84dac75";
 
 // Helpers
 
@@ -131,11 +131,14 @@ function describeTxError(label: string, error: unknown): string {
   if (/erc20insufficientallowance|insufficient allowance/.test(raw)) {
     return "Approval amount is too low. Approve again.";
   }
+  if (/enginebacklogtoolarge/.test(raw)) {
+    return "The pool timer is too far behind for one transaction. Try again later or ask the team to run an epoch catch-up.";
+  }
   if (/epochstale|epochnotready|failed_would_revert|would revert/.test(raw)) {
-    return "The pool timer is behind live time. Run Sync Engine First, then try again.";
+    return "The pool timer moved while the wallet was estimating. Refresh and try again; V2 syncs inside the action.";
   }
   if (/principalstilllocked|positionnotmatured/.test(raw)) {
-    return "This lock is not withdrawable yet. Sync the engine and check the unlock epoch again.";
+    return "This lock is not withdrawable yet. Refresh and check the unlock epoch again.";
   }
   if (/invaliddepositamount/.test(raw)) {
     return "Entry amount is outside the pool's min/max range.";
@@ -147,7 +150,7 @@ function describeTxError(label: string, error: unknown): string {
     return "The pool is full right now. Wait for a spot to open.";
   }
   if (/drawnotready/.test(raw)) {
-    return "The draw is not ready yet. Sync the engine and wait for the draw timer.";
+    return "The draw is not ready yet. Wait for the draw timer and at least one live entry.";
   }
   if (/drawalreadypending/.test(raw)) {
     return "A draw is already pending. Wait for Chainlink VRF to finish.";
@@ -159,7 +162,7 @@ function describeTxError(label: string, error: unknown): string {
     return label + " found nothing claimable for this wallet. Refresh and check the position again.";
   }
   if (/smart transaction failed|transaction receipt with hash .* could not be found|could not be found|originaltransactionstatus|cancelled|canceled/.test(raw)) {
-    return "The wallet dropped this request before Base accepted it. Sync the engine and retry.";
+    return "The wallet dropped this request before Base accepted it. Refresh and retry.";
   }
   const first = rawText.split("\n")[0];
   return first || `${label} failed. Try again.`;
@@ -264,12 +267,11 @@ export default function App() {
 
   const [depositAmount, setDepositAmount] = useState("");
   const [flash, setFlash] = useState<Flash | null>(null);
-  const [txStep, setTxStep] = useState<"idle" | "approving" | "syncing" | "depositing" | "withdrawing" | "drawing" | "claiming" | "harvesting">("idle");
+  const [txStep, setTxStep] = useState<"idle" | "approving" | "depositing" | "withdrawing" | "drawing" | "claiming">("idle");
   const [drawHistory, setDrawHistory] = useState<DrawRecord[]>([]);
   const [liveParticipantCount, setLiveParticipantCount] = useState<number | null>(null);
   const [liveParticipantWeight, setLiveParticipantWeight] = useState<bigint | null>(null);
   const [copiedAddr, setCopiedAddr] = useState<string | null>(null);
-  const [harvestCursor, setHarvestCursor] = useState(0n);
 
   const isWrongNetwork = Boolean(isConnected && chainId != null && chainId !== NARA_CHAIN_ID);
 
@@ -444,6 +446,13 @@ export default function App() {
   const drawFrequencyEpochs = poolConfig ? Number(poolConfig.drawFrequencyEpochs ?? 0n) : 0;
   const minDepositAmount = poolConfig ? (poolConfig.minDepositAmount as bigint) : 0n;
   const maxDepositAmount = poolConfig ? (poolConfig.maxDepositAmount as bigint) : 0n;
+  const minDrawPotNara = poolConfig ? (poolConfig.minDrawPotNara as bigint) : 0n;
+  const minDrawPotEth = poolConfig ? (poolConfig.minDrawPotEth as bigint) : 0n;
+  const minPrizeLabel = minDrawPotNara > 0n && minDrawPotEth > 0n
+    ? `${formatNara(minDrawPotNara)} NARA or ${formatEth(minDrawPotEth)} ETH`
+    : minDrawPotNara > 0n
+      ? `${formatNara(minDrawPotNara)} NARA`
+      : `${formatEth(minDrawPotEth)} ETH`;
   const openSpots = Math.max(0, maxParticipants - participantCount);
   const liveEntriesKnown = liveParticipantCount !== null && liveParticipantWeight !== null;
   const liveEntries = liveParticipantCount ?? 0;
@@ -540,12 +549,6 @@ export default function App() {
                 : null
       : null;
 
-  const participantCountBigInt = BigInt(Math.max(0, participantCount));
-  const activeHarvestCursor = participantCountBigInt > 0n ? harvestCursor % participantCountBigInt : 0n;
-  const harvestBatchEnd = participantCountBigInt > 0n
-    ? (activeHarvestCursor + HARVEST_BATCH_SIZE > participantCountBigInt ? participantCountBigInt : activeHarvestCursor + HARVEST_BATCH_SIZE)
-    : 0n;
-
   // Draw history fetch
 
   const fetchDrawHistory = useCallback(async () => {
@@ -590,13 +593,6 @@ export default function App() {
   useEffect(() => {
     void fetchDrawHistory();
   }, [fetchDrawHistory]);
-
-  useEffect(() => {
-    const count = BigInt(Math.max(0, participantCount));
-    if (count === 0n || harvestCursor >= count) {
-      setHarvestCursor(0n);
-    }
-  }, [harvestCursor, participantCount]);
 
   useEffect(() => {
     let cancelled = false;
@@ -697,26 +693,6 @@ export default function App() {
     queryClient.invalidateQueries();
   }, [queryClient]);
 
-  const refreshEpochStatus = useCallback(async () => {
-    await Promise.allSettled([
-      currentEpochRead.refetch(),
-      epochStateRead.refetch(),
-      participantCountRead.refetch(),
-      participantDataRead.refetch(),
-      lastDrawEpochRead.refetch(),
-      pendingDrawRequestIdRead.refetch(),
-    ]);
-    queryClient.invalidateQueries();
-  }, [
-    currentEpochRead,
-    epochStateRead,
-    lastDrawEpochRead,
-    participantCountRead,
-    participantDataRead,
-    pendingDrawRequestIdRead,
-    queryClient,
-  ]);
-
   const ensureWalletReady = useCallback((action: string) => {
     if (!isConnected) {
       setFlash({ tone: "error", text: `Connect your wallet to ${action}.` });
@@ -739,15 +715,6 @@ export default function App() {
     }
     return true;
   }, [ensureWalletReady, publicClient]);
-
-  const ensureEngineSynced = useCallback((action: string) => {
-    if (!engineSyncRequired) return true;
-    setFlash({
-      tone: "error",
-      text: `The pool timer is ${backlog} epoch${backlog === 1 ? "" : "s"} behind live time. Run Sync Engine First, then ${action}.`,
-    });
-    return false;
-  }, [backlog, engineSyncRequired]);
 
   const waitForConfirmation = useCallback(async (hash: Hash, label: string) => {
     if (!publicClient) throw new Error("Base RPC is not ready yet.");
@@ -783,38 +750,10 @@ export default function App() {
     }
   };
 
-  const handleSyncEngine = async (nextAction = "continue") => {
-    if (!ensureTransactionReady("sync the pool timer") || !engineSyncRequired) return;
-    setTxStep("syncing");
-    setFlash({ tone: "neutral", text: `Syncing ${backlog} epoch${backlog === 1 ? "" : "s"} before you ${nextAction}. Confirm in your wallet.` });
-    try {
-      const hash = backlog > 1
-        ? await writeContractAsync({
-            address: NARA_ENGINE_ADDRESS,
-            abi: engineAbi,
-            functionName: "advanceEpochs",
-            args: [BigInt(backlog)],
-          })
-        : await writeContractAsync({
-            address: NARA_ENGINE_ADDRESS,
-            abi: engineAbi,
-            functionName: "advanceEpoch",
-          });
-      await waitForConfirmation(hash, "Engine sync");
-      await refreshEpochStatus();
-      setFlash({ tone: "success", text: `Pool timer synced. You can ${nextAction} now.`, txHash: hash });
-    } catch (err) {
-      setFlash({ tone: "error", text: describeTxError("Sync", err) });
-    } finally {
-      setTxStep("idle");
-    }
-  };
-
   const handleDeposit = async () => {
     if (!ensureTransactionReady("enter the draw") || !depositAmount || lockFeeWeiRead.data == null || amountError) return;
-    if (!ensureEngineSynced("join")) return;
     setTxStep("depositing");
-    setFlash({ tone: "neutral", text: `Step 2 of 2 - Joining with ${formatNara(amountWei)} NARA. This sends ${formatEth(lockFeeWei)} ETH fee plus gas.` });
+    setFlash({ tone: "neutral", text: `Step 2 of 2 - Joining with ${formatNara(amountWei)} NARA. This sends ${formatEth(lockFeeWei)} ETH fee plus gas. V2 syncs the engine inside this transaction if needed.` });
     try {
       const hash = await writeContractAsync({
         address: NARA_LOTTO_POOL_ADDRESS,
@@ -842,13 +781,12 @@ export default function App() {
 
   const handleWithdraw = async () => {
     if (!ensureTransactionReady("withdraw principal") || unlockFeeWeiRead.data == null) return;
-    if (!ensureEngineSynced("withdraw")) return;
     if (hasUnlockEthShortfall) {
       setFlash({ tone: "error", text: `You need at least ${formatEth(unlockFeeWei)} ETH on Base for the unlock fee, plus gas.` });
       return;
     }
     setTxStep("withdrawing");
-    setFlash({ tone: "neutral", text: `Withdrawing your net locked NARA. This sends ${formatEth(unlockFeeWei)} ETH unlock fee plus gas.` });
+    setFlash({ tone: "neutral", text: `Withdrawing your net locked NARA. V2 syncs the engine and moves your clone yield into the jackpot before unlock. This sends ${formatEth(unlockFeeWei)} ETH unlock fee plus gas.` });
     try {
       const hash = await writeContractAsync({
         address: NARA_LOTTO_POOL_ADDRESS,
@@ -868,17 +806,26 @@ export default function App() {
 
   const handleDrawWinner = async () => {
     if (!ensureTransactionReady("trigger the draw")) return;
-    if (!ensureEngineSynced("run the draw")) return;
     setTxStep("drawing");
-    setFlash({ tone: "neutral", text: "Running the prize draw. Chainlink VRF will pick the winner." });
+    setFlash({ tone: "neutral", text: "Running the draw check. V2 syncs the engine and moves available yield into the jackpot first; Chainlink VRF starts only if the jackpot meets the minimum." });
     try {
       const hash = await writeContractAsync({
         address: NARA_LOTTO_POOL_ADDRESS,
         abi: lottoPoolAbi,
         functionName: "drawWinner",
       });
-      await waitForConfirmation(hash, "Draw request");
-      setFlash({ tone: "neutral", text: "Prize draw request confirmed. Waiting for Chainlink VRF randomness.", txHash: hash });
+      const receipt = await waitForConfirmation(hash, "Draw request");
+      const skippedForSmallPrize = receipt.logs.some((log) =>
+        log.address.toLowerCase() === NARA_LOTTO_POOL_ADDRESS.toLowerCase()
+        && log.topics[0] === DRAW_SKIPPED_PRIZE_TOPIC,
+      );
+      setFlash({
+        tone: skippedForSmallPrize ? "success" : "neutral",
+        text: skippedForSmallPrize
+          ? `Draw check confirmed. V2 moved any available yield, but the jackpot is still below the ${minPrizeLabel} minimum, so no VRF draw started yet.`
+          : "Prize draw request confirmed. Waiting for Chainlink VRF randomness.",
+        txHash: hash,
+      });
       invalidateLotto();
       fetchDrawHistory();
     } catch (err) {
@@ -903,56 +850,6 @@ export default function App() {
       invalidateLotto();
     } catch (err) {
       setFlash({ tone: "error", text: describeTxError("Claim", err) });
-    } finally {
-      setTxStep("idle");
-    }
-  };
-
-  const handleHarvest = async () => {
-    if (!ensureTransactionReady("harvest yield")) return;
-    const client = publicClient;
-    if (!client) return;
-    if (!ensureEngineSynced("move yield")) return;
-    if (participantCountBigInt === 0n) {
-      setFlash({ tone: "error", text: "There are no active entries to harvest yet." });
-      return;
-    }
-    setTxStep("harvesting");
-    setFlash({ tone: "neutral", text: `Moving yield for entries ${Number(activeHarvestCursor) + 1}-${Number(harvestBatchEnd)} of ${participantCount}.` });
-    try {
-      const hash = await writeContractAsync({
-        address: NARA_LOTTO_POOL_ADDRESS,
-        abi: lottoPoolAbi,
-        functionName: "harvestBatch",
-        args: [activeHarvestCursor, HARVEST_BATCH_SIZE],
-      });
-      await waitForConfirmation(hash, "Yield harvest");
-      const [nextPotNara, nextPotEth] = await Promise.all([
-        client.readContract({
-          address: NARA_LOTTO_POOL_ADDRESS,
-          abi: lottoPoolAbi,
-          functionName: "potNara",
-        }),
-        client.readContract({
-          address: NARA_LOTTO_POOL_ADDRESS,
-          abi: lottoPoolAbi,
-          functionName: "potEth",
-        }),
-      ]);
-      const addedNara = nextPotNara > potNara ? nextPotNara - potNara : 0n;
-      const addedEth = nextPotEth > potEth ? nextPotEth - potEth : 0n;
-      const nextCursor = harvestBatchEnd >= participantCountBigInt ? 0n : harvestBatchEnd;
-      setHarvestCursor(nextCursor);
-      setFlash({
-        tone: "success",
-        text: addedNara === 0n && addedEth === 0n
-          ? `Harvest confirmed, but there was no new claimable yield in this batch. Current pool: ${formatNara(nextPotNara)} NARA + ${formatEth(nextPotEth)} ETH.`
-          : `Harvest confirmed. Added ${formatNara(addedNara)} NARA + ${formatEth(addedEth)} ETH. ${nextCursor === 0n ? "All current entry batches have been covered." : `Next click resumes at entry ${Number(nextCursor) + 1}.`}`,
-        txHash: hash,
-      });
-      invalidateLotto();
-    } catch (err) {
-      setFlash({ tone: "error", text: describeTxError("Harvest", err) });
     } finally {
       setTxStep("idle");
     }
@@ -1141,7 +1038,7 @@ export default function App() {
               </div>
               <div className="nb-fact-card">
                 <span className="nb-fact-label">Draw needs</span>
-                <strong className="nb-fact-value">{MIN_ACTIVE_PLAYERS} live player</strong>
+                <strong className="nb-fact-value">{minPrizeLabel} jackpot</strong>
               </div>
             </div>
           )}
@@ -1170,12 +1067,6 @@ export default function App() {
                 <div className="nb-step-indicator">
                   <span className="nb-step-dot" />
                   Step 1 of 2: Approve NARA
-                </div>
-              )}
-              {txStep === "syncing" && (
-                <div className="nb-step-indicator">
-                  <span className="nb-step-dot" />
-                  Ready Check: Sync Pool Timer
                 </div>
               )}
               {txStep === "depositing" && (
@@ -1259,14 +1150,12 @@ export default function App() {
 
               {engineSyncRequired && (
                 <div className="nb-soft-note">
-                  Sync needed first. The pool timer is {backlog} epoch{backlog === 1 ? "" : "s"} behind live time. Run one quick sync before you join so MetaMask can price the transaction cleanly.
+                  The pool timer is {backlog} epoch{backlog === 1 ? "" : "s"} behind live time. V2 catches up inside Join, Withdraw, and Draw so there is no separate sync step.
                 </div>
               )}
 
               <p className="nb-wallet-action-note">
-                {engineSyncRequired
-                  ? "Approve anytime, then run Sync Engine First. After that, Join Pool will work normally."
-                  : "You will see 2 wallet popups: approve, then join."}
+                You will see 2 wallet popups: approve, then join. The join transaction syncs the engine automatically if needed.
               </p>
 
               <div className="nb-button-row">
@@ -1290,24 +1179,18 @@ export default function App() {
                 <button
                   type="button"
                   className="nb-btn-primary"
-                  onClick={engineSyncRequired ? () => handleSyncEngine("join") : handleDeposit}
-                  disabled={engineSyncRequired ? isBusy || !publicClient : isBusy || !isApproved || !canDeposit || amountWei === 0n}
-                  aria-disabled={engineSyncRequired ? isBusy || !publicClient : !canDeposit || !isApproved || isBusy}
-                  aria-busy={txStep === "syncing" || txStep === "depositing"}
+                  onClick={handleDeposit}
+                  disabled={isBusy || !isApproved || !canDeposit || amountWei === 0n}
+                  aria-disabled={!canDeposit || !isApproved || isBusy}
+                  aria-busy={txStep === "depositing"}
                 >
-                  {txStep === "syncing" ? (
-                    <>
-                      <span className="nb-spinner" aria-hidden="true" />
-                      <span className="nb-sr-only">Syncing...</span>
-                      Syncing...
-                    </>
-                  ) : txStep === "depositing" ? (
+                  {txStep === "depositing" ? (
                     <>
                       <span className="nb-spinner" aria-hidden="true" />
                       <span className="nb-sr-only">Joining...</span>
                       Joining...
                     </>
-                  ) : engineSyncRequired ? "Sync Engine First" : "Join Pool"}
+                  ) : "Join Pool"}
                 </button>
               </div>
             </>
@@ -1334,14 +1217,14 @@ export default function App() {
                 <span className="nb-rule-num">3</span>
                 <div>
                   <p className="nb-rule-title">Draw runs on the timer</p>
-                  <p className="nb-rule-copy">When the timer is ready and at least one entry is live, anyone can run the draw. Fresh entries still need to finish warm-up first.</p>
+                  <p className="nb-rule-copy">When the timer is ready and at least one entry is live, anyone can run the draw. V2 moves yield into the jackpot first and skips VRF if the jackpot is still too small.</p>
                 </div>
               </div>
               <div className="nb-rule-item">
                 <span className="nb-rule-num">4</span>
                 <div>
                   <p className="nb-rule-title">Withdraw later</p>
-                  <p className="nb-rule-copy">Your net principal stays locked for {epochsToTime(Number(lockDurationEpochs))}, then you can withdraw it back to your wallet after the engine is synced.</p>
+                  <p className="nb-rule-copy">Your net principal stays locked for {epochsToTime(Number(lockDurationEpochs))}, then Withdraw syncs, moves your yield into the jackpot, and returns your NARA.</p>
                 </div>
               </div>
             </div>
@@ -1422,11 +1305,11 @@ export default function App() {
                     </div>
                     <div className="nb-status-card">
                       <span className="nb-status-label">Withdraw opens</span>
-                      <strong className="nb-status-value">{canWithdraw ? "Now" : canWithdrawAfterSync ? "After sync" : epochsToDate(currentEpoch, unlocksInEpochs)}</strong>
+                      <strong className="nb-status-value">{withdrawActionReady ? "Now" : epochsToDate(currentEpoch, unlocksInEpochs)}</strong>
                     </div>
                     <div className="nb-status-card">
                       <span className="nb-status-label">Time left</span>
-                      <strong className="nb-status-value">{canWithdraw ? "Ready now" : canWithdrawAfterSync ? "Sync first" : epochsToTime(unlocksInEpochs)}</strong>
+                      <strong className="nb-status-value">{withdrawActionReady ? "Ready now" : epochsToTime(unlocksInEpochs)}</strong>
                     </div>
                   </div>
 
@@ -1442,17 +1325,17 @@ export default function App() {
                     >
                       <div className="nb-prog-fill" style={{ width: String(lockProgressPct) + "%" }} />
                     </div>
-                    <p className="nb-input-hint">{withdrawActionReady ? (engineSyncRequired ? "Sync the engine first, then withdraw." : "Your net principal can be withdrawn now.") : "Unlocks on " + epochsToDate(currentEpoch, unlocksInEpochs) + "."}</p>
+                    <p className="nb-input-hint">{withdrawActionReady ? "Your net principal can be withdrawn now." : "Unlocks on " + epochsToDate(currentEpoch, unlocksInEpochs) + "."}</p>
                   </div>
 
                   {withdrawActionReady && engineSyncRequired && (
                     <div className="nb-soft-note">
-                      The unlock time has passed, but the engine is {backlog} epoch{backlog === 1 ? "" : "s"} behind live time. Sync first so MetaMask does not simulate a failing withdrawal.
+                      The unlock time has passed and the engine is {backlog} epoch{backlog === 1 ? "" : "s"} behind live time. V2 syncs and harvests your clone inside the withdrawal transaction.
                     </div>
                   )}
-                  {canWithdraw && !engineSyncRequired && (
+                  {canWithdraw && (
                     <div className="nb-soft-note">
-                      Withdrawal sends the {formatEth(unlockFeeWei)} ETH unlock fee plus gas, then returns your net locked NARA.
+                      Withdrawal sends the {formatEth(unlockFeeWei)} ETH unlock fee plus gas, moves your clone yield into the jackpot, then returns your net locked NARA.
                     </div>
                   )}
                   {hasUnlockEthShortfall && (
@@ -1462,26 +1345,20 @@ export default function App() {
                   <button
                     type="button"
                     className="nb-btn-secondary"
-                    onClick={engineSyncRequired && withdrawActionReady ? () => handleSyncEngine("withdraw") : handleWithdraw}
-                    disabled={isBusy || !withdrawActionReady || (!engineSyncRequired && hasUnlockEthShortfall)}
-                    title={withdrawActionReady ? (engineSyncRequired ? "Sync engine before withdrawing" : "Withdraw net locked principal") : "Unlocks at epoch " + unlockEpoch + " (" + epochsToDate(currentEpoch, Math.max(0, unlockEpoch - currentEpoch)) + ")"}
-                    aria-disabled={!withdrawActionReady || isBusy || (!engineSyncRequired && hasUnlockEthShortfall)}
-                    aria-busy={txStep === "withdrawing" || txStep === "syncing"}
+                    onClick={handleWithdraw}
+                    disabled={isBusy || !withdrawActionReady || hasUnlockEthShortfall}
+                    title={withdrawActionReady ? "Withdraw net locked principal" : "Unlocks at epoch " + unlockEpoch + " (" + epochsToDate(currentEpoch, Math.max(0, unlockEpoch - currentEpoch)) + ")"}
+                    aria-disabled={!withdrawActionReady || isBusy || hasUnlockEthShortfall}
+                    aria-busy={txStep === "withdrawing"}
                   >
-                    {txStep === "syncing" ? (
-                      <>
-                        <span className="nb-spinner" aria-hidden="true" />
-                        <span className="nb-sr-only">Syncing...</span>
-                        Syncing...
-                      </>
-                    ) : txStep === "withdrawing" ? (
+                    {txStep === "withdrawing" ? (
                       <>
                         <span className="nb-spinner" aria-hidden="true" />
                         <span className="nb-sr-only">Withdrawing...</span>
                         Withdrawing...
                       </>
                     ) : withdrawActionReady
-                        ? (engineSyncRequired ? "Sync Engine First" : "Withdraw NARA")
+                        ? "Withdraw NARA"
                         : "Available at epoch " + unlockEpoch}
                   </button>
                 </>
@@ -1528,33 +1405,21 @@ export default function App() {
           </div>
 
           <p className="nb-draw-explainer">
-            The timer shows when a draw window opens. A draw should only be run after at least one entry is live. Fresh entries do not count until their warm-up ends.
-            {engineSyncRequired ? ` The engine is ${backlog} epoch${backlog === 1 ? "" : "s"} behind, so sync before moving yield, drawing, or withdrawing.` : ""}
+            V2 has no separate yield button. Run Draw syncs the engine, moves available clone yield into the jackpot, and only starts Chainlink VRF if the jackpot meets the minimum.
+            {engineSyncRequired ? ` The engine is ${backlog} epoch${backlog === 1 ? "" : "s"} behind; the draw transaction catches up automatically within the V2 limit.` : ""}
           </p>
 
           {!isConnected || isWrongNetwork ? (
             <div className="nb-draw-wallet-note">
               <p className="nb-wallet-help-text">
                 {!isConnected
-                  ? "Connect a wallet to move yield or run the draw."
-                  : `Switch to ${NARA_CHAIN_NAME} to move yield or run the draw.`}
+                  ? "Connect a wallet to run the draw."
+                  : `Switch to ${NARA_CHAIN_NAME} to run the draw.`}
               </p>
               <WalletActionButton className="nb-btn-secondary" connectLabel="Connect Wallet" />
             </div>
           ) : (
             <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-              {engineSyncRequired && !drawPending && (
-                <button
-                  type="button"
-                  className="nb-btn-gold"
-                  style={{ width: "auto", minWidth: "180px", marginBottom: 0 }}
-                  onClick={() => handleSyncEngine("continue")}
-                  disabled={isBusy || !publicClient}
-                  aria-busy={txStep === "syncing"}
-                >
-                  {txStep === "syncing" ? "Syncing..." : "Sync Engine First"}
-                </button>
-              )}
               {drawWaitingForLiveEntry && !drawPending && (
                 <button
                   type="button"
@@ -1567,7 +1432,7 @@ export default function App() {
                   Waiting For Live Entry
                 </button>
               )}
-              {drawReady && !drawPending && !engineSyncRequired && (
+              {drawReady && !drawPending && (
                 <button
                   type="button"
                   className="nb-btn-gold"
@@ -1585,16 +1450,6 @@ export default function App() {
                   ) : "Run Draw"}
                 </button>
               )}
-              <button
-                type="button"
-                className="nb-btn-secondary"
-                style={{ width: "auto", minWidth: "140px", marginBottom: 0 }}
-                onClick={engineSyncRequired ? () => handleSyncEngine("move yield") : handleHarvest}
-                disabled={isBusy || participantCount === 0 || (engineSyncRequired && !publicClient)}
-                title="Move available yield from participant positions into the prize pool"
-              >
-                {txStep === "syncing" ? "Syncing..." : txStep === "harvesting" ? "Moving Yield..." : engineSyncRequired ? "Sync Before Yield" : participantCount > 50 ? `Move Yield ${Number(activeHarvestCursor) + 1}-${Number(harvestBatchEnd)}` : "Move Yield To Pool"}
-              </button>
             </div>
           )}
         </div>

@@ -8,7 +8,7 @@ export const NARA_ENGINE_TREASURY = "0x39139CA6cB1b2330a612D28691a0E66E0af69a40"
 export const NARA_OWNER_WALLET = "0xC019Dc79412c4b20103ac4ce97B2615FF45D490d";
 export const NARA_OPERATOR_WALLET = "0xcf222f05911e3AbeF77F2A552C623c122522F670";
 export const NARA_LOCK_NFT_ADDRESS = "0x2654602d8b0A7e328dcEC553aC2d1D289fC3B5da";
-export const NARA_LOTTO_POOL_ADDRESS = "0xd0138Bd1859422A6E7E77165e3300A93Cd389343";
+export const NARA_LOTTO_POOL_ADDRESS = "0xca6909FB6Fcfe7cE37DDe6e62eaB21157734CD37";
 export const DEFAULT_BASE_RPC_URL = "https://mainnet.base.org";
 
 export const DEFAULT_EXCLUDED_WALLETS = [
@@ -471,6 +471,43 @@ export const lottoPoolAbi = [
           { name: "lockDurationEpochs", type: "uint64" },
           { name: "drawFrequencyEpochs", type: "uint64" },
           { name: "maxParticipants", type: "uint64" },
+          { name: "maxSyncSteps", type: "uint64" },
+          { name: "minDrawPotNara", type: "uint256" },
+          { name: "minDrawPotEth", type: "uint256" },
+        ],
+        type: "tuple",
+      },
+    ],
+  },
+  {
+    name: "getPoolState",
+    type: "function",
+    stateMutability: "view",
+    inputs: [{ name: "user", type: "address" }],
+    outputs: [
+      {
+        components: [
+          { name: "liveEpoch", type: "uint64" },
+          { name: "settledEpoch", type: "uint64" },
+          { name: "engineBacklog", type: "uint64" },
+          { name: "nextDrawEpoch", type: "uint64" },
+          { name: "drawPending", type: "bool" },
+          { name: "drawReadyByTime", type: "bool" },
+          { name: "drawReadyByPrize", type: "bool" },
+          { name: "participantCount", type: "uint256" },
+          { name: "liveParticipantCount", type: "uint256" },
+          { name: "liveLottoWeight", type: "uint256" },
+          { name: "userWeight", type: "uint256" },
+          { name: "userOddsBps", type: "uint256" },
+          { name: "isParticipant", type: "bool" },
+          { name: "canWithdraw", type: "bool" },
+          { name: "unlockEpoch", type: "uint64" },
+          { name: "potNara", type: "uint256" },
+          { name: "potEth", type: "uint256" },
+          { name: "pendingDrawPotNara", type: "uint256" },
+          { name: "pendingDrawPotEth", type: "uint256" },
+          { name: "userWinningsNara", type: "uint256" },
+          { name: "userWinningsEth", type: "uint256" },
         ],
         type: "tuple",
       },
@@ -489,16 +526,6 @@ export const lottoPoolAbi = [
     stateMutability: "payable",
     inputs: [],
     outputs: [],
-  },
-  {
-    name: "harvestBatch",
-    type: "function",
-    stateMutability: "nonpayable",
-    inputs: [
-      { name: "cursor", type: "uint256" },
-      { name: "count", type: "uint256" },
-    ],
-    outputs: [{ name: "nextCursor", type: "uint256" }],
   },
   { name: "drawWinner", type: "function", stateMutability: "nonpayable", inputs: [], outputs: [] },
   { name: "claimWinnings", type: "function", stateMutability: "nonpayable", inputs: [], outputs: [] },
