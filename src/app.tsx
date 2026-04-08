@@ -268,6 +268,7 @@ export default function App() {
   const [depositAmount, setDepositAmount] = useState("");
   const [flash, setFlash] = useState<Flash | null>(null);
   const [txStep, setTxStep] = useState<"idle" | "approving" | "depositing" | "withdrawing" | "drawing" | "claiming">("idle");
+  const [txPhase, setTxPhase] = useState<"wallet" | "chain" | null>(null);
   const [drawHistory] = useState<DrawRecord[]>([]);
   const [liveParticipantCount, setLiveParticipantCount] = useState<number | null>(null);
   const [liveParticipantWeight, setLiveParticipantWeight] = useState<bigint | null>(null);
@@ -688,6 +689,7 @@ export default function App() {
 
   const waitForConfirmation = useCallback(async (hash: Hash, label: string) => {
     if (!publicClient) throw new Error("Base RPC is not ready yet.");
+    setTxPhase("chain");
     setFlash({ tone: "neutral", text: `${label} submitted. Waiting for Base confirmation.`, txHash: hash });
     const receipt = await publicClient.waitForTransactionReceipt({ hash });
     if (receipt.status === "reverted") {
@@ -701,7 +703,8 @@ export default function App() {
   const handleApprove = async () => {
     if (!ensureTransactionReady("approve NARA") || !depositAmount || amountWei === 0n || amountError) return;
     setTxStep("approving");
-    setFlash({ tone: "neutral", text: `Step 1 of 2 - Approve ${formatNara(amountWei)} NARA for the prize pool. Confirm in your wallet.` });
+    setTxPhase("wallet");
+    setFlash({ tone: "neutral", text: `Step 1 of 2 — Approve ${formatNara(amountWei)} NARA. Confirm in your wallet.` });
     try {
       const hash = await writeContractAsync({
         address: NARA_TOKEN_ADDRESS,
@@ -710,20 +713,22 @@ export default function App() {
         args: [NARA_LOTTO_POOL_ADDRESS as `0x${string}`, amountWei],
       });
       await waitForConfirmation(hash, "Approval");
-      setFlash({ tone: "success", text: `${formatNara(amountWei)} NARA approval confirmed for the prize pool.`, txHash: hash });
+      setFlash({ tone: "success", text: `${formatNara(amountWei)} NARA approved. Now click Join Pool.`, txHash: hash });
       await tokenAllowanceRead.refetch();
       invalidateLotto();
     } catch (err) {
       setFlash({ tone: "error", text: describeTxError("Approval", err) });
     } finally {
       setTxStep("idle");
+      setTxPhase(null);
     }
   };
 
   const handleDeposit = async () => {
     if (!ensureTransactionReady("enter the draw") || !depositAmount || lockFeeWeiRead.data == null || amountError) return;
     setTxStep("depositing");
-    setFlash({ tone: "neutral", text: `Step 2 of 2 - Joining with ${formatNara(amountWei)} NARA. This sends ${formatEth(lockFeeWei)} ETH fee plus gas. V2 syncs the engine inside this transaction if needed.` });
+    setTxPhase("wallet");
+    setFlash({ tone: "neutral", text: `Step 2 of 2 — Joining with ${formatNara(amountWei)} NARA. Confirm in your wallet.` });
     try {
       const hash = await writeContractAsync({
         address: NARA_LOTTO_POOL_ADDRESS,
@@ -746,6 +751,7 @@ export default function App() {
       setFlash({ tone: "error", text: describeTxError("Deposit", err) });
     } finally {
       setTxStep("idle");
+      setTxPhase(null);
     }
   };
 
@@ -756,7 +762,8 @@ export default function App() {
       return;
     }
     setTxStep("withdrawing");
-    setFlash({ tone: "neutral", text: `Withdrawing your net locked NARA. V2 syncs the engine and moves your clone yield into the jackpot before unlock. This sends ${formatEth(unlockFeeWei)} ETH unlock fee plus gas.` });
+    setTxPhase("wallet");
+    setFlash({ tone: "neutral", text: `Withdrawing your NARA. Confirm in your wallet.` });
     try {
       const hash = await writeContractAsync({
         address: NARA_LOTTO_POOL_ADDRESS,
@@ -771,13 +778,15 @@ export default function App() {
       setFlash({ tone: "error", text: describeTxError("Withdrawal", err) });
     } finally {
       setTxStep("idle");
+      setTxPhase(null);
     }
   };
 
   const handleDrawWinner = async () => {
     if (!ensureTransactionReady("trigger the draw")) return;
     setTxStep("drawing");
-    setFlash({ tone: "neutral", text: "Running the draw check. V2 syncs the engine and moves available yield into the jackpot first; Chainlink VRF starts only if the jackpot meets the minimum." });
+    setTxPhase("wallet");
+    setFlash({ tone: "neutral", text: "Triggering draw check. Confirm in your wallet." });
     try {
       const hash = await writeContractAsync({
         address: NARA_LOTTO_POOL_ADDRESS,
@@ -792,8 +801,8 @@ export default function App() {
       setFlash({
         tone: skippedForSmallPrize ? "success" : "neutral",
         text: skippedForSmallPrize
-          ? `Draw check confirmed. V2 moved any available yield, but the jackpot is still below the ${minPrizeLabel} minimum, so no VRF draw started yet.`
-          : "Prize draw request confirmed. Waiting for Chainlink VRF randomness.",
+          ? `Draw check confirmed. Jackpot still below the ${minPrizeLabel} minimum — no VRF started yet.`
+          : "Draw requested. Waiting for Chainlink VRF randomness.",
         txHash: hash,
       });
       invalidateLotto();
@@ -802,12 +811,14 @@ export default function App() {
       setFlash({ tone: "error", text: describeTxError("Draw trigger", err) });
     } finally {
       setTxStep("idle");
+      setTxPhase(null);
     }
   };
 
   const handleClaimWinnings = async () => {
     if (!ensureTransactionReady("claim winnings")) return;
     setTxStep("claiming");
+    setTxPhase("wallet");
     setFlash({ tone: "neutral", text: "Claiming your prize. Confirm in your wallet." });
     try {
       const hash = await writeContractAsync({
@@ -816,12 +827,13 @@ export default function App() {
         functionName: "claimWinnings",
       });
       await waitForConfirmation(hash, "Prize claim");
-      setFlash({ tone: "success", text: "Winnings claim confirmed and sent to your wallet.", txHash: hash });
+      setFlash({ tone: "success", text: "Winnings claimed and sent to your wallet.", txHash: hash });
       invalidateLotto();
     } catch (err) {
       setFlash({ tone: "error", text: describeTxError("Claim", err) });
     } finally {
       setTxStep("idle");
+      setTxPhase(null);
     }
   };
 
@@ -1036,9 +1048,11 @@ export default function App() {
                       aria-disabled={!canDeposit || isApproved || isBusy}
                       aria-busy={txStep === "approving"}
                     >
-                      {txStep === "approving" ? (
-                        <><span className="nb-spinner" aria-hidden="true" /><span className="nb-sr-only">Approving...</span>Approving...</>
-                      ) : isApproved ? "Approved" : "Approve"}
+                      {txStep === "approving"
+                        ? txPhase === "chain"
+                          ? <><span className="nb-spinner" aria-hidden="true" /><span className="nb-sr-only">Confirming...</span>Confirming...</>
+                          : <><span className="nb-spinner" aria-hidden="true" /><span className="nb-sr-only">Waiting for wallet...</span>Waiting...</>
+                        : isApproved ? "Approved" : "Approve"}
                     </button>
 
                     <button
@@ -1049,9 +1063,11 @@ export default function App() {
                       aria-disabled={!canDeposit || !isApproved || isBusy}
                       aria-busy={txStep === "depositing"}
                     >
-                      {txStep === "depositing" ? (
-                        <><span className="nb-spinner" aria-hidden="true" /><span className="nb-sr-only">Joining...</span>Joining...</>
-                      ) : "Join Pool"}
+                      {txStep === "depositing"
+                        ? txPhase === "chain"
+                          ? <><span className="nb-spinner" aria-hidden="true" /><span className="nb-sr-only">Confirming...</span>Confirming...</>
+                          : <><span className="nb-spinner" aria-hidden="true" /><span className="nb-sr-only">Waiting for wallet...</span>Waiting...</>
+                        : "Join Pool"}
                     </button>
                   </div>
                 </>
@@ -1194,9 +1210,11 @@ export default function App() {
                     disabled={isBusy}
                     aria-busy={txStep === "claiming"}
                   >
-                    {txStep === "claiming" ? (
-                      <><span className="nb-spinner" aria-hidden="true" /><span className="nb-sr-only">Claiming...</span>Claiming...</>
-                    ) : "Claim Prize"}
+                    {txStep === "claiming"
+                      ? txPhase === "chain"
+                        ? <><span className="nb-spinner" aria-hidden="true" /><span className="nb-sr-only">Confirming...</span>Confirming...</>
+                        : <><span className="nb-spinner" aria-hidden="true" /><span className="nb-sr-only">Waiting for wallet...</span>Waiting...</>
+                      : "Claim Prize"}
                   </button>
                 </div>
               )}
@@ -1267,9 +1285,11 @@ export default function App() {
                     aria-disabled={!withdrawActionReady || isBusy || hasUnlockEthShortfall}
                     aria-busy={txStep === "withdrawing"}
                   >
-                    {txStep === "withdrawing" ? (
-                      <><span className="nb-spinner" aria-hidden="true" /><span className="nb-sr-only">Withdrawing...</span>Withdrawing...</>
-                    ) : withdrawActionReady ? "Withdraw NARA" : `Epoch ${unlockEpoch}`}
+                    {txStep === "withdrawing"
+                      ? txPhase === "chain"
+                        ? <><span className="nb-spinner" aria-hidden="true" /><span className="nb-sr-only">Confirming...</span>Confirming...</>
+                        : <><span className="nb-spinner" aria-hidden="true" /><span className="nb-sr-only">Waiting for wallet...</span>Waiting...</>
+                      : withdrawActionReady ? "Withdraw NARA" : `Epoch ${unlockEpoch}`}
                   </button>
                 </>
               ) : (
@@ -1313,9 +1333,11 @@ export default function App() {
                 disabled={isBusy}
                 aria-busy={txStep === "drawing"}
               >
-                {txStep === "drawing" ? (
-                  <><span className="nb-spinner" aria-hidden="true" /><span className="nb-sr-only">Running draw...</span>Running...</>
-                ) : "Run Draw"}
+                {txStep === "drawing"
+                  ? txPhase === "chain"
+                    ? <><span className="nb-spinner" aria-hidden="true" /><span className="nb-sr-only">Confirming...</span>Confirming...</>
+                    : <><span className="nb-spinner" aria-hidden="true" /><span className="nb-sr-only">Waiting for wallet...</span>Waiting...</>
+                  : "Run Draw"}
               </button>
             ) : null}
           </div>
