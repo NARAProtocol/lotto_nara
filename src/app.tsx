@@ -1013,35 +1013,49 @@ export default function App() {
                 </div>
               )}
 
-              <p className="nb-wallet-action-note">2 wallet popups: approve, then join.</p>
+              {hasNaraShortfall && amountWei > 0n ? (
+                <div className="nb-button-row">
+                  <a
+                    href={`https://app.uniswap.org/swap?chain=base&outputCurrency=0xE444de61752bD13D1D37Ee59c31ef4e489bd727C`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="nb-btn-primary nb-btn-get-nara"
+                  >
+                    Get NARA on Uniswap ↗
+                  </a>
+                </div>
+              ) : (
+                <>
+                  <p className="nb-wallet-action-note">2 wallet popups: approve, then join.</p>
+                  <div className="nb-button-row">
+                    <button
+                      type="button"
+                      className="nb-btn-secondary"
+                      onClick={handleApprove}
+                      disabled={isBusy || amountWei === 0n || isApproved || !canDeposit}
+                      aria-disabled={!canDeposit || isApproved || isBusy}
+                      aria-busy={txStep === "approving"}
+                    >
+                      {txStep === "approving" ? (
+                        <><span className="nb-spinner" aria-hidden="true" /><span className="nb-sr-only">Approving...</span>Approving...</>
+                      ) : isApproved ? "Approved" : "Approve"}
+                    </button>
 
-              <div className="nb-button-row">
-                <button
-                  type="button"
-                  className="nb-btn-secondary"
-                  onClick={handleApprove}
-                  disabled={isBusy || amountWei === 0n || isApproved || !canDeposit}
-                  aria-disabled={!canDeposit || isApproved || isBusy}
-                  aria-busy={txStep === "approving"}
-                >
-                  {txStep === "approving" ? (
-                    <><span className="nb-spinner" aria-hidden="true" /><span className="nb-sr-only">Approving...</span>Approving...</>
-                  ) : isApproved ? "Approved" : "Approve"}
-                </button>
-
-                <button
-                  type="button"
-                  className="nb-btn-primary"
-                  onClick={handleDeposit}
-                  disabled={isBusy || !isApproved || !canDeposit || amountWei === 0n}
-                  aria-disabled={!canDeposit || !isApproved || isBusy}
-                  aria-busy={txStep === "depositing"}
-                >
-                  {txStep === "depositing" ? (
-                    <><span className="nb-spinner" aria-hidden="true" /><span className="nb-sr-only">Joining...</span>Joining...</>
-                  ) : "Join Pool"}
-                </button>
-              </div>
+                    <button
+                      type="button"
+                      className="nb-btn-primary"
+                      onClick={handleDeposit}
+                      disabled={isBusy || !isApproved || !canDeposit || amountWei === 0n}
+                      aria-disabled={!canDeposit || !isApproved || isBusy}
+                      aria-busy={txStep === "depositing"}
+                    >
+                      {txStep === "depositing" ? (
+                        <><span className="nb-spinner" aria-hidden="true" /><span className="nb-sr-only">Joining...</span>Joining...</>
+                      ) : "Join Pool"}
+                    </button>
+                  </div>
+                </>
+              )}
             </>
           )}
         </div>

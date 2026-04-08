@@ -1051,6 +1051,17 @@ img { display: block; max-width: 100%; }
 .nb-btn-primary:active:not(:disabled) { transform: scale(0.97); }
 .nb-btn-primary:disabled { opacity: 0.42; cursor: not-allowed; }
 
+.nb-btn-get-nara {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  background: linear-gradient(135deg, #e8a820, #c98219);
+  box-shadow: 0 12px 28px rgba(201,130,25,0.32);
+  color: #fff;
+  letter-spacing: 0.14em;
+}
+
 .nb-btn-secondary {
   width: 100%;
   min-height: 44px;
