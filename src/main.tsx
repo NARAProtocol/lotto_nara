@@ -22,8 +22,9 @@ const config = getDefaultConfig({
   projectId,
   chains: [base],
   transports: {
-    [base.id]: http(baseRpcUrl),
+    [base.id]: http(baseRpcUrl, { batch: { batchSize: 20, wait: 50 } }),
   },
+  pollingInterval: 30_000,
 });
 
 const queryClient = new QueryClient({

@@ -8,7 +8,7 @@ import {
   usePublicClient,
 } from "wagmi";
 import { useQueryClient } from "@tanstack/react-query";
-import { formatEther, parseEther, type Hash, type Log } from "viem";
+import { formatEther, parseEther, type Hash } from "viem";
 
 import {
   NARA_CHAIN_ID,
@@ -268,7 +268,7 @@ export default function App() {
   const [depositAmount, setDepositAmount] = useState("");
   const [flash, setFlash] = useState<Flash | null>(null);
   const [txStep, setTxStep] = useState<"idle" | "approving" | "depositing" | "withdrawing" | "drawing" | "claiming">("idle");
-  const [drawHistory, setDrawHistory] = useState<DrawRecord[]>([]);
+  const [drawHistory] = useState<DrawRecord[]>([]);
   const [liveParticipantCount, setLiveParticipantCount] = useState<number | null>(null);
   const [liveParticipantWeight, setLiveParticipantWeight] = useState<bigint | null>(null);
   const [copiedAddr, setCopiedAddr] = useState<string | null>(null);
@@ -552,51 +552,10 @@ export default function App() {
 
   // Draw history fetch
 
-  const fetchDrawHistory = useCallback(async () => {
-    if (!publicClient) return;
-    // Skip log fetching when no draws have happened — avoids 400s from RPC
-    if (lastDrawEpoch === 0) return;
-    try {
-      const currentBlock = await publicClient.getBlockNumber();
-      const LOG_RANGE = 200n;
-      const fromBlock = currentBlock > LOG_RANGE ? currentBlock - LOG_RANGE : 0n;
-      const logs = await publicClient.getLogs({
-        address: NARA_LOTTO_POOL_ADDRESS,
-        event: {
-          name: "WinnerDrawn",
-          type: "event",
-          inputs: [
-            { name: "winner", type: "address", indexed: true },
-            { name: "potNara", type: "uint256", indexed: false },
-            { name: "potEth", type: "uint256", indexed: false },
-            { name: "protocolCutEth", type: "uint256", indexed: false },
-          ],
-        },
-        fromBlock,
-        toBlock: currentBlock,
-      });
-      const records: DrawRecord[] = logs
-        .slice(-10)
-        .reverse()
-        .map((log: Log) => {
-          const args = (log as any).args ?? {};
-          return {
-            winner: args.winner ?? "0x",
-            potNara: BigInt(args.potNara ?? 0n),
-            potEth: BigInt(args.potEth ?? 0n),
-            txHash: log.transactionHash ?? "",
-            blockNumber: log.blockNumber ?? 0n,
-          };
-        });
-      setDrawHistory(records);
-    } catch {
-      // silently fail - no history to show
-    }
-  }, [publicClient, lastDrawEpoch]);
-
-  useEffect(() => {
-    void fetchDrawHistory();
-  }, [fetchDrawHistory]);
+  // Draw history via getLogs is disabled — no draws have occurred yet
+  // and the Alchemy free-tier RPC rejects getLogs calls with 400.
+  // Re-enable when the first VRF draw completes.
+  const fetchDrawHistory = useCallback(() => {}, []);
 
   useEffect(() => {
     let cancelled = false;
