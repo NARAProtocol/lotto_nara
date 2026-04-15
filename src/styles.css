@@ -292,6 +292,79 @@ img { display: block; max-width: 100%; }
   margin-top: 28px;
 }
 
+.nb-jackpot-meta {
+  position: relative;
+  width: min(760px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.nb-jackpot-season {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.nb-jackpot-season-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(201,130,25,0.16);
+  background: rgba(255,255,255,0.04);
+}
+
+.nb-jackpot-season-label,
+.nb-jackpot-breakdown-label {
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(232,184,74,0.62);
+}
+
+.nb-jackpot-season-value,
+.nb-jackpot-breakdown-value {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #f6ead0;
+  font-variant-numeric: tabular-nums;
+}
+
+.nb-jackpot-breakdown {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(201,130,25,0.16);
+  background: rgba(255,255,255,0.035);
+}
+
+.nb-jackpot-breakdown-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.nb-jackpot-hint {
+  margin: 0;
+  font-size: 10px;
+  color: rgba(246,234,208,0.72);
+  letter-spacing: 0.04em;
+  line-height: 1.6;
+}
+
+.nb-jackpot-share-row {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .nb-jackpot-badge {
   display: inline-flex;
   align-items: center;
@@ -540,6 +613,10 @@ img { display: block; max-width: 100%; }
   grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
   gap: 8px;
   margin-top: auto;
+}
+
+.nb-button-row.single {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .nb-button-row .nb-btn-primary,
@@ -1173,6 +1250,7 @@ img { display: block; max-width: 100%; }
 .nb-badge.warming    { background: rgba(24,119,242,0.08); color: #2d66af; border: 1px solid rgba(24,119,242,0.2); }
 .nb-badge.not-in-draw{ background: var(--t50-bg); color: var(--t50-col); border: 1px solid var(--t50-brd); }
 .nb-badge.winner-badge{ background: var(--t500-bg); color: var(--t500-col); border: 1px solid var(--t500-brd); }
+.nb-badge.season     { background: rgba(201,130,25,0.1); color: #d9a64a; border: 1px solid rgba(201,130,25,0.25); }
 
 /* ── Spinner ── */
 .nb-spinner {
@@ -1203,6 +1281,28 @@ img { display: block; max-width: 100%; }
 .nb-table td { padding: 10px 14px; border-top: 1px solid rgba(25,22,18,0.06); vertical-align: middle; }
 .nb-table tr:first-child td { border-top: none; }
 .nb-table tr:hover td { background: rgba(255,255,255,0.6); }
+
+.nb-recent-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.nb-row-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(201,130,25,0.08);
+  border: 1px solid rgba(201,130,25,0.18);
+  color: var(--gold);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
 
 .nb-copy-btn {
   display: inline-flex; align-items: center; justify-content: center;
@@ -1249,7 +1349,135 @@ img { display: block; max-width: 100%; }
 
 .nb-wallet-action-note { margin: 0 0 10px; font-size: 10px; color: var(--muted); line-height: 1.5; }
 
+.nb-btn-inline {
+  width: auto;
+  min-height: 38px;
+  padding: 0 14px;
+}
+
 .nb-info-text { font-size: 11px; color: var(--muted); letter-spacing: 0.04em; line-height: 1.6; margin: 0 0 14px; }
+
+.nb-join-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.nb-join-head .nb-join-sub {
+  margin-bottom: 0;
+  max-width: 54ch;
+}
+
+.nb-mode-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 999px;
+  border: 1px solid rgba(25,22,18,0.08);
+  background: rgba(255,255,255,0.72);
+  flex-shrink: 0;
+}
+
+.nb-mode-pill {
+  min-height: 34px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 140ms var(--ease-out), color 140ms var(--ease-out), transform 120ms var(--ease-out);
+}
+
+.nb-mode-pill:hover:not(:disabled) {
+  color: var(--text);
+  background: rgba(25,22,18,0.05);
+}
+
+.nb-mode-pill.is-active {
+  background: rgba(24,119,242,0.1);
+  color: var(--accent);
+}
+
+.nb-mode-pill:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.nb-compact-stack {
+  margin-bottom: 12px;
+}
+
+.nb-entry-block + .nb-sponsor-block {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(25,22,18,0.08);
+}
+
+.nb-entry-topline--stack {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.nb-badge-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.nb-sponsor-block {
+  display: grid;
+  gap: 12px;
+}
+
+.nb-sponsor-list {
+  display: grid;
+  gap: 8px;
+}
+
+.nb-sponsor-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(25,22,18,0.08);
+  background: rgba(255,255,255,0.68);
+}
+
+.nb-sponsor-copy {
+  min-width: 0;
+}
+
+.nb-sponsor-row-title {
+  margin: 0 0 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.nb-sponsor-row-meta {
+  margin: 0;
+  font-size: 10px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.nb-btn-compact {
+  min-height: 34px;
+  padding: 0 12px;
+  white-space: nowrap;
+}
 
 .nb-prog-label { font-size: 9px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 3px; }
 .nb-prog-hint  { font-size: 10px; color: var(--muted); letter-spacing: 0.05em; margin-top: 4px; }
@@ -1314,6 +1542,12 @@ img { display: block; max-width: 100%; }
 }
 
 @media (max-width: 720px) {
+  .nb-jackpot-season { grid-template-columns: 1fr; }
+  .nb-join-head { flex-direction: column; }
+  .nb-mode-toggle { width: 100%; justify-content: space-between; }
+  .nb-sponsor-row { flex-direction: column; align-items: flex-start; }
+  .nb-jackpot-breakdown-row { flex-direction: column; align-items: flex-start; }
+  .nb-recent-header { flex-direction: column; align-items: flex-start; }
   .nb-shell { padding: 20px 12px 52px; }
   .nb-nav { flex-direction: column; align-items: stretch; }
   .nb-nav-brand { gap: 10px; }

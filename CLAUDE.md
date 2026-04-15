@@ -32,7 +32,7 @@ Before redesigning UI or debugging wallet flow, inspect protocol timing first.
 ## Current Implementation Reference
 
 - Main logic: `src/app.tsx`
-- Historical notes: `../../docs/LOTTO_RUNBOOK.md`
+- Historical notes: `../../nara-protocol-hardhat/docs/LOTTO_RUNBOOK.md`
 
 ## Deploy Rule
 
@@ -44,3 +44,9 @@ Before redesigning UI or debugging wallet flow, inspect protocol timing first.
 
 Use `NARA Lucky Epoch` in the visible UI.
 Keep the frontend static and production-safe unless a server-side feature is explicitly requested.
+
+## Live Contract Reference
+
+- Live lotto pool: `0x81573dEDa5BcED23f0754cf3D0D2553d3694a0Ba`
+- Lock account implementation: `0xf91C6b06103F088547FBa690B85DBc2269075A90`
+- Keep `src/shared/nara.ts` aligned with this live pool unless an intentional redeploy occurs.

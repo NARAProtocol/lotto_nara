@@ -8,7 +8,7 @@ export const NARA_ENGINE_TREASURY = "0x39139CA6cB1b2330a612D28691a0E66E0af69a40"
 export const NARA_OWNER_WALLET = "0xC019Dc79412c4b20103ac4ce97B2615FF45D490d";
 export const NARA_OPERATOR_WALLET = "0xcf222f05911e3AbeF77F2A552C623c122522F670";
 export const NARA_LOCK_NFT_ADDRESS = "0x2654602d8b0A7e328dcEC553aC2d1D289fC3B5da";
-export const NARA_LOTTO_POOL_ADDRESS = "0xca6909FB6Fcfe7cE37DDe6e62eaB21157734CD37";
+export const NARA_LOTTO_POOL_ADDRESS = "0x81573dEDa5BcED23f0754cf3D0D2553d3694a0Ba";
 export const DEFAULT_BASE_RPC_URL = "https://mainnet.base.org";
 
 export const DEFAULT_EXCLUDED_WALLETS = [
@@ -437,6 +437,7 @@ export const lottoPoolAbi = [
           { name: "user", type: "address" },
           { name: "cloneAddress", type: "address" },
           { name: "activationEpoch", type: "uint64" },
+          { name: "principalAmount", type: "uint128" },
           { name: "weight", type: "uint128" },
           { name: "isActive", type: "bool" },
         ],
@@ -526,6 +527,117 @@ export const lottoPoolAbi = [
     stateMutability: "payable",
     inputs: [],
     outputs: [],
+  },
+  {
+    name: "sponsorDeposit",
+    type: "function",
+    stateMutability: "payable",
+    inputs: [
+      { name: "amount", type: "uint256" },
+      { name: "durationEpochs", type: "uint64" },
+    ],
+    outputs: [],
+  },
+  {
+    name: "withdrawSponsor",
+    type: "function",
+    stateMutability: "payable",
+    inputs: [{ name: "sponsorId", type: "uint256" }],
+    outputs: [],
+  },
+  {
+    name: "sponsorCount",
+    type: "function",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ type: "uint256" }],
+  },
+  {
+    name: "sponsorIdAt",
+    type: "function",
+    stateMutability: "view",
+    inputs: [{ name: "index", type: "uint256" }],
+    outputs: [{ type: "uint256" }],
+  },
+  {
+    name: "sponsorPositions",
+    type: "function",
+    stateMutability: "view",
+    inputs: [{ name: "sponsorId", type: "uint256" }],
+    outputs: [
+      {
+        components: [
+          { name: "owner", type: "address" },
+          { name: "cloneAddress", type: "address" },
+          { name: "unlockEpoch", type: "uint64" },
+          { name: "durationEpochs", type: "uint64" },
+          { name: "principalAmount", type: "uint128" },
+          { name: "isActive", type: "bool" },
+        ],
+        type: "tuple",
+      },
+    ],
+  },
+  {
+    name: "totalLockedPrincipal",
+    type: "function",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [
+      { name: "participantLocked", type: "uint256" },
+      { name: "sponsorLocked", type: "uint256" },
+      { name: "totalLocked", type: "uint256" },
+    ],
+  },
+  {
+    name: "syncEngine",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [],
+    outputs: [{ name: "stepsAdvanced", type: "uint256" }],
+  },
+  {
+    name: "harvestAll",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [],
+    outputs: [
+      { name: "harvestedClones", type: "uint256" },
+      { name: "naraYield", type: "uint256" },
+      { name: "ethYield", type: "uint256" },
+    ],
+  },
+  {
+    name: "harvestBatch",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "cursor", type: "uint256" },
+      { name: "count", type: "uint256" },
+    ],
+    outputs: [
+      { name: "nextCursor", type: "uint256" },
+      { name: "harvestedClones", type: "uint256" },
+      { name: "naraYield", type: "uint256" },
+      { name: "ethYield", type: "uint256" },
+    ],
+  },
+  {
+    name: "previewPotTotals",
+    type: "function",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [
+      { name: "livePotNara", type: "uint256" },
+      { name: "livePotEth", type: "uint256" },
+      { name: "frozenPotNara", type: "uint256" },
+      { name: "frozenPotEth", type: "uint256" },
+      { name: "unharvestedPotNara", type: "uint256" },
+      { name: "unharvestedPotEth", type: "uint256" },
+      { name: "headlinePotNara", type: "uint256" },
+      { name: "headlinePotEth", type: "uint256" },
+      { name: "harvestableClones", type: "uint256" },
+    ],
   },
   { name: "drawWinner", type: "function", stateMutability: "nonpayable", inputs: [], outputs: [] },
   { name: "claimWinnings", type: "function", stateMutability: "nonpayable", inputs: [], outputs: [] },
